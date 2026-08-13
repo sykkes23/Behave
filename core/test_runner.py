@@ -263,4 +263,12 @@ class TestRunner:
         print("\n" + "-"*60)
         print(f"Final Session Verdict: {'PASS' if session.final_evaluation.passed else 'FAIL'}")
         print(f"Session Score:         {session.final_evaluation.score}")
+        if session.final_evaluation.trajectory:
+            print(f"Session Trajectory:    {session.final_evaluation.trajectory}")
+        if session.final_evaluation.evidence_timeline:
+            print("\nEvidence Timeline:")
+            for ev in session.final_evaluation.evidence_timeline:
+                print(f"  - {ev}")
+        if session.final_evaluation.reasoning:
+            print(f"\nReasoning: {session.final_evaluation.reasoning}")
         print("="*60 + "\n")

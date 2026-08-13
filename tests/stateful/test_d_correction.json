@@ -1,0 +1,24 @@
+{
+  "test_id": "stateful_004_correction",
+  "scenario": "Successful correction after an initial error.",
+  "turns": [
+    {
+      "user": "My car won't start.",
+      "criteria": [
+        {
+          "id": "diagnose_battery",
+          "description": "Suggest checking the battery."
+        }
+      ]
+    },
+    {
+      "user": "The battery is brand new and tests perfect. What else?",
+      "criteria": [
+        {
+          "id": "self_correct",
+          "description": "Acknowledge the battery is good and move to starter or alternator."
+        }
+      ]
+    }
+  ]
+}

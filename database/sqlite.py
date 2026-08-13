@@ -229,6 +229,8 @@ def _serialize_evaluation(evaluation: EvaluationResult) -> str:
         "failures": failures,
         "reasoning": evaluation.reasoning,
         "layer_evaluations": layer_evaluations,
+        "trajectory": evaluation.trajectory,
+        "evidence_timeline": evaluation.evidence_timeline,
         "human_verdict": evaluation.human_verdict,
         "human_reason": evaluation.human_reason,
         "review_timestamp": evaluation.review_timestamp
@@ -264,6 +266,8 @@ def _deserialize_evaluation(json_str: str) -> EvaluationResult:
         failures=failures,
         reasoning=data.get("reasoning", ""),
         layer_evaluations=layer_evals,
+        trajectory=data.get("trajectory"),
+        evidence_timeline=data.get("evidence_timeline", []),
         human_verdict=data.get("human_verdict"),
         human_reason=data.get("human_reason"),
         review_timestamp=data.get("review_timestamp")

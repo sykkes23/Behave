@@ -1,5 +1,14 @@
 from enum import Enum
 
+class BehavioralTrajectory(str, Enum):
+    IMPROVING = "IMPROVING"
+    STABLE = "STABLE"
+    DEGRADING = "DEGRADING"
+    SELF_CORRECTING = "SELF_CORRECTING"
+    STUBBORN = "STUBBORN"
+    UNRESOLVED = "UNRESOLVED"
+    UNKNOWN = "UNKNOWN"
+
 class FailureTag(str, Enum):
     HALLUCINATION = "hallucination"
     UNSUPPORTED_CLAIM = "unsupported_claim"

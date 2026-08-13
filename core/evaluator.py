@@ -150,15 +150,25 @@ class Evaluator:
                 any_turn_failed = True
             all_failures.extend(turn.evaluation.failures)
             
-        # We can implement a specific Session LLM Judge here later.
-        # For now, deterministic aggregation: if any turn failed, session fails.
         passed = not any_turn_failed
         score = sum([t.evaluation.score for t in turns]) / len(turns) if turns else 100.0
+        
+        trajectory = None
+        evidence_timeline = []
+        reasoning = "Session evaluated based on aggregation of turn results."
+        
+        if isinstance(self.llm_judge_provider, LLMJudge):
+            traj, reason, timeline, _ = self.llm_judge_provider.evaluate_session(spec, turns)
+            trajectory = traj
+            evidence_timeline = timeline
+            reasoning = reason
         
         return EvaluationResult(
             passed=passed,
             score=score,
             failures=all_failures,
-            reasoning="Session evaluated based on aggregation of turn results.",
+            reasoning=reasoning,
+            trajectory=trajectory,
+            evidence_timeline=evidence_timeline,
             layer_evaluations=[]
         )

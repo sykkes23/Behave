@@ -56,6 +56,9 @@ class EvaluationResult:
     failures: List[EvaluationFailure] = field(default_factory=list)
     reasoning: str = ""
     layer_evaluations: List[LayerEvaluation] = field(default_factory=list)
+    # Session-level holistic fields
+    trajectory: Optional[str] = None
+    evidence_timeline: List[str] = field(default_factory=list)
     # Human Override Fields
     human_verdict: Optional[str] = None  # PASS, FAIL, PARTIAL, INVALID TEST
     human_reason: Optional[str] = None

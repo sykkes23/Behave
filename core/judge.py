@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Any, Tuple
 from core.schema import TestSpec, LayerVerdict, EvaluationFailure
-from core.taxonomy import FailureTag, RootCause, Severity
+from core.taxonomy import FailureTag, RootCause, Severity, BehavioralTrajectory
 from models.provider import BaseProvider
 
 JUDGE_PROMPT_TEMPLATE = """
@@ -63,6 +63,44 @@ CRITERIA:
 
 MODEL RESPONSE TO EVALUATE:
 {response}
+"""
+
+SESSION_JUDGE_PROMPT_TEMPLATE = """
+You are a holistic AI Session Judge. 
+Your task is to evaluate the BEHAVIORAL TRAJECTORY of an entire multi-turn conversation.
+
+You will receive the original scenario, the chronological transcript of the conversation, and the evaluations of individual turns.
+
+BEHAVIORAL TRAJECTORY OPTIONS:
+- IMPROVING
+- STABLE
+- DEGRADING
+- SELF_CORRECTING
+- STUBBORN
+- UNRESOLVED
+
+IMPORTANT RULES:
+1. Do not overwrite or erase previous failures. If the model failed in Turn 1, that failure is real, even if it self-corrects in Turn 3.
+2. Evaluate based on OBSERVABLE behavior in the transcript. Do not invent internal reasoning.
+3. Distinguish between an initial hypothesis that is updated (GOOD) vs an initial hypothesis that is stubbornly defended against evidence (BAD).
+
+You must output EXACTLY a valid JSON object matching this schema. Do not output markdown code blocks.
+
+{{
+  "trajectory": "IMPROVING" | "STABLE" | "DEGRADING" | "SELF_CORRECTING" | "STUBBORN" | "UNRESOLVED",
+  "reasoning": "Overall explanation of the conversation trajectory.",
+  "evidence_timeline": [
+    "Turn 1: Model makes hypothesis A.",
+    "Turn 2: User provides evidence contradicting A.",
+    "Turn 3: Model acknowledges contradiction and adopts hypothesis B."
+  ]
+}}
+
+SCENARIO:
+{scenario}
+
+TRANSCRIPT AND TURN EVALUATIONS:
+{transcript}
 """
 
 class LLMJudge:
@@ -174,3 +212,66 @@ class LLMJudge:
             return LayerVerdict.ERROR, f"Judge returned invalid structure: {str(e)}", [], {}, {}
         except Exception as e:
             return LayerVerdict.ERROR, f"Judge execution failed: {str(e)}", [], {}, {}
+
+    def evaluate_session(self, spec: TestSpec, turns: list) -> Tuple[str, str, list, dict]:
+        """
+        Evaluates the chronological conversation and returns:
+        (trajectory, reasoning, evidence_timeline, metadata_info)
+        """
+        transcript_parts = []
+        for turn in turns:
+            transcript_parts.append(f"--- TURN {turn.turn_number} ---")
+            transcript_parts.append(f"USER: {turn.user_input}")
+            transcript_parts.append(f"MODEL: {turn.ai_response}")
+            transcript_parts.append(f"EVALUATION: {'PASS' if turn.evaluation.passed else 'FAIL'}")
+            
+            failures_str = ", ".join([f.tags[0] for f in turn.evaluation.failures])
+            if failures_str:
+                transcript_parts.append(f"FAILURES DETECTED: {failures_str}")
+            transcript_parts.append("")
+            
+        transcript_str = "\n".join(transcript_parts)
+        
+        prompt = SESSION_JUDGE_PROMPT_TEMPLATE.strip().format(
+            scenario=spec.scenario,
+            transcript=transcript_str
+        )
+        
+        try:
+            provider_res = self.provider.generate_response(prompt)
+            content = provider_res.content.strip()
+            
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+                
+            data = json.loads(content.strip())
+            
+            trajectory = data.get("trajectory", "UNKNOWN")
+            try:
+                BehavioralTrajectory(trajectory)
+            except ValueError:
+                raise ValueError(f"Invalid behavioral trajectory: {trajectory}")
+                
+            reasoning = data.get("reasoning", "")
+            evidence_timeline = data.get("evidence_timeline", [])
+            
+            if not isinstance(evidence_timeline, list):
+                raise ValueError("evidence_timeline must be a list of strings")
+                
+            return trajectory, reasoning, evidence_timeline, {
+                "judge_provider": provider_res.provider,
+                "judge_model": provider_res.model,
+                "judge_model_version": provider_res.model_version,
+                "prompt_template": SESSION_JUDGE_PROMPT_TEMPLATE.strip()
+            }
+            
+        except json.JSONDecodeError as e:
+            return "UNKNOWN", f"Session Judge returned malformed JSON: {str(e)}", [], {}
+        except ValueError as e:
+            return "UNKNOWN", f"Session Judge returned invalid structure: {str(e)}", [], {}
+        except Exception as e:
+            return "UNKNOWN", f"Session Judge execution failed: {str(e)}", [], {}
