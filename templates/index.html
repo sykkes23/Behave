@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Behave AI Laboratory</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --muted: #94a3b8;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .text-center { text-align: center; }
+        h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.8rem; margin-top: 2rem; border-bottom: 1px solid var(--muted); padding-bottom: 0.5rem; }
+        p.lead { font-size: 1.25rem; color: var(--muted); margin-bottom: 3rem; }
+        
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin: 0 10px;
+        }
+        .btn:hover { background: var(--primary-hover); }
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+        }
+        .btn-outline:hover { background: rgba(59, 130, 246, 0.1); }
+        
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        .card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        /* Progress */
+        .progress-bar-container {
+            width: 100%;
+            background: #334155;
+            border-radius: 8px;
+            height: 24px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* Results */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-box {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-box.full { grid-column: span 2; }
+        .stat-label { color: var(--muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.8rem; font-weight: bold; margin-top: 5px; }
+        
+        .decision-badge {
+            display: inline-block;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 2rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 20px 0;
+        }
+        .decision-DEPLOY { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 2px solid var(--success); }
+        .decision-CONDITIONAL { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 2px solid var(--warning); }
+        .decision-REGRESSION { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 2px solid var(--danger); }
+        .decision-BLOCKED { background: rgba(220, 38, 38, 0.4); color: #fca5a5; border: 2px solid var(--danger); }
+        
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: var(--muted); }
+        input[type="text"], select {
+            width: 100%;
+            padding: 12px;
+            background: #334155;
+            border: 1px solid #475569;
+            color: white;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid var(--danger);
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .dev-mode {
+            margin-top: 40px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .dev-mode summary {
+            padding: 15px;
+            cursor: pointer;
+            background: #1e293b;
+            color: var(--muted);
+            font-weight: bold;
+        }
+        .dev-mode pre {
+            padding: 15px;
+            margin: 0;
+            overflow-x: auto;
+            color: #a78bfa;
+            font-size: 0.9rem;
+        }
+        .failure-change {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+        .text-warning { color: var(--warning); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- LANDING PAGE -->
+    <div id="screen-landing" class="screen active text-center">
+        <h1>BEHAVE</h1>
+        <h2 style="margin-top: 0; font-size: 1.5rem; color: var(--muted); border: none;">AI BEHAVIOR TEST LAB</h2>
+        <p class="lead" style="margin-bottom: 2rem;">Does your AI actually get better when you change it?</p>
+        
+        <div class="card" style="text-align: center; max-width: 600px; margin: 0 auto 40px auto; background: transparent; box-shadow: none;">
+            <p>No installation. No API key required. No Python required.</p>
+        </div>
+        
+        <div>
+            <button class="btn" style="font-size: 1.5rem; padding: 15px 40px;" onclick="showScreen('screen-choose')">TRY DEMO</button>
+        </div>
+    </div>
+
+    <!-- CHOOSE AGENT PAGE -->
+    <div id="screen-choose" class="screen text-center">
+        <button class="btn btn-outline" style="position: absolute; top: 20px; left: 20px; padding: 8px 16px; font-size: 0.9rem;" onclick="showScreen('screen-landing')">← Back</button>
+        <h2>Choose an agent</h2>
+        
+        <div class="card" style="max-width: 500px; margin: 0 auto;">
+            <button class="btn btn-outline" style="display: block; width: 100%; margin: 10px 0; font-size: 1.2rem; padding: 15px;" onclick="startDemo()">Demo Agent (Built-in)</button>
+            <button class="btn btn-outline" style="display: block; width: 100%; margin: 10px 0; font-size: 1.2rem; padding: 15px;" onclick="showCustomForm('openai')">OpenAI-compatible endpoint</button>
+            <button class="btn btn-outline" style="display: block; width: 100%; margin: 10px 0; font-size: 1.2rem; padding: 15px;" onclick="showCustomForm('ollama')">Ollama</button>
+            <button class="btn btn-outline" style="display: block; width: 100%; margin: 10px 0; font-size: 1.2rem; padding: 15px;" onclick="showCustomForm('http')">Custom HTTP endpoint</button>
+        </div>
+    </div>
+
+    <!-- TEST MY AI FORM (Hidden inside Choose initially) -->
+    <div id="screen-test" class="screen">
+        <button class="btn btn-outline" style="margin: 0 0 20px 0; padding: 8px 16px; font-size: 0.9rem;" onclick="showScreen('screen-choose')">← Back</button>
+        <h2 id="custom-title">Configure Agent</h2>
+        <div class="card">
+            <input type="hidden" id="provider-type" value="http">
+            <div class="form-group">
+                <label>Baseline Agent Endpoint (v1)</label>
+                <input type="text" id="v1-endpoint" placeholder="http://localhost:8001/v1/chat/completions">
+            </div>
+            <div class="form-group">
+                <label>Candidate Agent Endpoint (v2)</label>
+                <input type="text" id="v2-endpoint" placeholder="http://localhost:8002/v1/chat/completions">
+            </div>
+            <div class="form-group">
+                <label>Test Size</label>
+                <select id="test-size">
+                    <option value="QUICK">QUICK (~10 tests)</option>
+                    <option value="STANDARD">STANDARD (~50 tests)</option>
+                    <option value="FULL">FULL (Entire available corpus)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>API Key (Optional)</label>
+                <input type="text" id="api-key" placeholder="Bearer token if required">
+            </div>
+            <button class="btn" style="width: 100%; margin: 0; padding: 15px; font-size: 1.2rem;" onclick="startCustomTest()">RUN TEST</button>
+        </div>
+    </div>
+
+    <!-- PROGRESS PAGE -->
+    <div id="screen-progress" class="screen text-center">
+        <h2 id="progress-title">Testing Agent v1 vs Agent v2</h2>
+        <div class="card">
+            <p id="progress-msg" style="font-size: 1.2rem;">Initializing...</p>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p id="progress-pct" style="color: var(--muted);">0%</p>
+        </div>
+    </div>
+
+    <!-- ERROR PAGE -->
+    <div id="screen-error" class="screen">
+        <h2>Connection Error</h2>
+        <div class="card">
+            <div class="error-message">
+                <strong>An error occurred while running the test.</strong><br><br>
+                Check that:<br>
+                • Your AI endpoints are running<br>
+                • The URLs include http:// or https://<br>
+                • The endpoint accepts POST requests
+            </div>
+            <p id="error-details" style="color: var(--danger); font-size: 0.9rem; margin-bottom: 20px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px;"></p>
+            <button class="btn" onclick="showScreen(lastScreen)">Try Again</button>
+        </div>
+    </div>
+
+    <div id="screen-results" class="screen">
+        <h2 class="text-center">RESULT</h2>
+        <div class="text-center" style="color: var(--muted); margin-bottom: 30px;">
+            <span id="res-baseline-name">Agent v1</span> → <span id="res-candidate-name">Agent v2</span>
+        </div>
+        
+        <div class="stat-grid" style="margin-bottom: 10px;">
+            <div class="stat-box">
+                <div class="stat-label">BEHAVIOR</div>
+                <div class="stat-value" id="res-score"></div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">SAFETY</div>
+                <div class="stat-value" id="res-crit"></div>
+            </div>
+        </div>
+
+        <div class="card text-center" style="background: transparent; box-shadow: none; padding-top: 0;">
+            <p style="color: var(--muted); margin-bottom: 5px;">Recommendation:</p>
+            <div class="decision-badge" id="res-decision">DEPLOY</div>
+            
+            <div style="margin-top: 15px;">
+                <button class="btn btn-outline" style="padding: 5px 15px; font-size: 0.9rem;" onclick="const wb = document.getElementById('why-box'); wb.style.display = wb.style.display === 'none' ? 'block' : 'none'">See Why</button>
+            </div>
+        </div>
+
+        <div class="card" id="why-box" style="display: none; border-left: 4px solid var(--primary);">
+            <div id="res-explanation" style="font-size: 1.1rem; margin-bottom: 15px; color: #cbd5e1;"></div>
+            <div id="why-content" style="color: #cbd5e1; line-height: 1.8;"></div>
+            
+            <h4 style="margin-top: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">Behavioral Changes</h4>
+            <div id="res-failures"></div>
+            
+            <div style="display: flex; justify-content: space-between; margin-top: 20px; color: var(--muted); font-size: 0.9rem;">
+                <div>Cost Change: <span id="res-cost"></span></div>
+                <div>Latency Change: <span id="res-lat"></span></div>
+            </div>
+        </div>
+        
+        <div class="text-center" style="margin-top: 30px;">
+            <button class="btn btn-outline" onclick="showScreen('screen-landing')">START OVER</button>
+            <button class="btn btn-outline" id="btn-export">EXPORT JSON</button>
+        </div>
+
+        <details class="dev-mode">
+            <summary>Developer Details</summary>
+            <pre id="dev-json"></pre>
+        </details>
+    </div>
+
+</div>
+
+<script>
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+    
+    function displayError(msg) {
+        document.getElementById('error-details').innerText = msg;
+        showScreen('screen-error');
+    }
+
+    let currentJobId = null;
+    let pollInterval = null;
+    let lastScreen = 'screen-landing';
+
+    function showCustomForm(provider) {
+        let title = "Configure Custom HTTP Endpoint";
+        let actualProvider = "http";
+        
+        if (provider === 'openai') {
+            title = "Configure OpenAI-compatible API";
+            actualProvider = "openai";
+            document.getElementById('v1-endpoint').placeholder = "http://localhost:8000/v1/chat/completions";
+        } else if (provider === 'ollama') {
+            title = "Configure Ollama API";
+            actualProvider = "openai"; // Ollama has openai compatible endpoints
+            document.getElementById('v1-endpoint').placeholder = "http://localhost:11434/v1/chat/completions";
+        } else {
+            document.getElementById('v1-endpoint').placeholder = "http://localhost:8080/v1/chat";
+        }
+        
+        document.getElementById('custom-title').innerText = title;
+        document.getElementById('provider-type').value = actualProvider;
+        showScreen('screen-test');
+    }
+
+    async function startDemo() {
+        lastScreen = 'screen-choose';
+        showScreen('screen-progress');
+        document.getElementById('progress-title').innerText = "Testing Agent v1 vs Agent v2";
+        try {
+            const res = await fetch('/api/demo/start', { method: 'POST' });
+            const data = await res.json();
+            currentJobId = data.job_id;
+            pollInterval = setInterval(pollJob, 500);
+        } catch (e) {
+            displayError(e.toString());
+        }
+    }
+
+    async function startCustomTest() {
+        const v1 = document.getElementById('v1-endpoint').value;
+        const v2 = document.getElementById('v2-endpoint').value;
+        const prov = document.getElementById('provider-type').value;
+        const size = document.getElementById('test-size').value;
+        const key = document.getElementById('api-key').value;
+        
+        if (!v1 || !v2) {
+            alert("Please enter both endpoints");
+            return;
+        }
+        
+        if (!v1.startsWith('http')) {
+            alert("Baseline endpoint must start with http:// or https://");
+            return;
+        }
+        if (!v2.startsWith('http')) {
+            alert("Candidate endpoint must start with http:// or https://");
+            return;
+        }
+        
+        lastScreen = 'screen-test';
+        showScreen('screen-progress');
+        document.getElementById('progress-title').innerText = "Testing Custom Endpoints";
+        try {
+            const res = await fetch('/api/test_ai/start', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    baseline_endpoint: v1,
+                    candidate_endpoint: v2,
+                    provider: prov,
+                    size: size,
+                    api_key: key
+                })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            currentJobId = data.job_id;
+            pollInterval = setInterval(pollJob, 1000);
+        } catch (e) {
+            displayError(e.toString());
+        }
+    }
+
+    async function pollJob() {
+        try {
+            const res = await fetch(`/api/jobs/${currentJobId}`);
+            const data = await res.json();
+            
+            if (data.status === 'FAILED') {
+                clearInterval(pollInterval);
+                displayError(data.error || "Unknown error occurred.");
+                return;
+            }
+            
+            document.getElementById('progress-bar').style.width = data.progress + '%';
+            document.getElementById('progress-pct').innerText = data.progress + '%';
+            document.getElementById('progress-msg').innerText = data.message || "Running...";
+            
+            if (data.status === 'COMPLETED') {
+                clearInterval(pollInterval);
+                loadResults(data.experiment_id);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function loadResults(exp_id) {
+        try {
+            const res = await fetch(`/api/experiments/${exp_id}/results`);
+            const data = await res.json();
+            
+            const expRes = await fetch(`/api/experiments/${exp_id}`);
+            const expData = await expRes.json();
+            
+            renderResults(expData, data);
+            showScreen('screen-results');
+            
+            document.getElementById('btn-export').onclick = () => {
+                window.location.href = `/api/report/${exp_id}/json`;
+            };
+        } catch (e) {
+            displayError(e.toString());
+        }
+    }
+
+    function renderResults(exp, stats) {
+        const dec = exp.final_decision;
+        const badge = document.getElementById('res-decision');
+        badge.innerText = dec;
+        badge.className = 'decision-badge decision-' + dec;
+        
+        document.getElementById('res-baseline-name').innerText = exp.baseline;
+        document.getElementById('res-candidate-name').innerText = exp.candidate;
+        
+        const s = stats.score_res;
+        const deltaStr = s.delta > 0 ? `+${s.delta.toFixed(1)}` : s.delta.toFixed(1);
+        document.getElementById('res-score').innerText = `${s.baseline_mean.toFixed(1)} → ${s.candidate_mean.toFixed(1)}`;
+        
+        const c = stats.crit_res;
+        if (c.candidate > 0) {
+            document.getElementById('res-crit').innerText = "FAIL";
+            document.getElementById('res-crit').style.color = "var(--danger)";
+        } else {
+            document.getElementById('res-crit').innerText = "PASS";
+            document.getElementById('res-crit').style.color = "var(--success)";
+        }
+        
+        const r = stats.res_res;
+        const cDelta = r.cost.delta_pct > 0 ? `+${r.cost.delta_pct.toFixed(1)}` : r.cost.delta_pct.toFixed(1);
+        const lDelta = r.latency.delta_pct > 0 ? `+${r.latency.delta_pct.toFixed(1)}` : r.latency.delta_pct.toFixed(1);
+        document.getElementById('res-cost').innerText = cDelta + "%";
+        document.getElementById('res-lat').innerText = lDelta + "%";
+        
+        // Failure changes
+        const failHtml = [];
+        for (const [tag, stat] of Object.entries(stats.tag_res)) {
+            if (stat.baseline_rate > 0 || stat.candidate_rate > 0) {
+                const bRate = (stat.baseline_rate * 100).toFixed(0);
+                const cRate = (stat.candidate_rate * 100).toFixed(0);
+                const color = stat.delta < 0 ? 'text-success' : (stat.delta > 0 ? 'text-danger' : '');
+                
+                let readableTag = tag.replace(/_/g, ' ');
+                readableTag = readableTag.charAt(0).toUpperCase() + readableTag.slice(1);
+                
+                failHtml.push(`
+                    <div class="failure-change">
+                        <span>${readableTag}</span>
+                        <span class="${color}">${bRate}% → ${cRate}%</span>
+                    </div>
+                `);
+            }
+        }
+        
+        if (failHtml.length === 0) {
+            document.getElementById('res-failures').innerHTML = '<div style="color: var(--muted)">No behavioral changes detected.</div>';
+        } else {
+            document.getElementById('res-failures').innerHTML = failHtml.join('');
+        }
+        
+        // Why Explanation
+        let expText = "";
+        let whyHtml = "";
+        
+        if (dec === 'DEPLOY') {
+            expText = "Agent v2 behaved better than Agent v1, and the improvement was statistically significant with no critical regressions.";
+            whyHtml = `
+                <div class="text-success">✓ Behavioral score improved</div>
+                <div class="text-success">✓ Statistical significance reached</div>
+                <div class="text-success">✓ No new critical failures</div>
+                <div class="text-success">✓ Cost and latency remained within policy limits</div>
+            `;
+        } else if (dec === 'CONDITIONAL') {
+            expText = "Agent v2 performed adequately, but the behavioral improvement is too small to guarantee it will always be better than Agent v1.";
+            whyHtml = `
+                <div class="text-success">✓ No new critical failures</div>
+                <div class="text-success">✓ Cost and latency remained within policy limits</div>
+                <br>
+                <div class="text-warning">⚠ Improvement was not statistically significant</div>
+                <div style="font-size: 0.9rem; margin-top: 5px;">(The sample size was too small, or the improvement was marginal)</div>
+            `;
+        } else if (dec === 'REGRESSION') {
+            expText = "Agent v2 produced worse behavior or broke resource constraints compared to the baseline.";
+            whyHtml = `
+                <div class="text-danger">✗ Regression detected in behavior or resource utilization</div>
+                <div style="font-size: 0.9rem; margin-top: 5px;">Candidate agent failed to outperform the baseline.</div>
+            `;
+        } else if (dec === 'BLOCKED') {
+            expText = "Agent v2 introduced a severe safety or critical behavior violation. Deployment is prohibited.";
+            whyHtml = `
+                <div class="text-danger">✗ New critical failure detected</div>
+                <br>
+                <div>The candidate agent produced behavior classified as critical. Because critical safety failures cannot be averaged away, the deployment decision is BLOCKED.</div>
+            `;
+        }
+        
+        document.getElementById('res-explanation').innerText = expText;
+        document.getElementById('why-content').innerHTML = whyHtml;
+        
+        // Dev Details
+        document.getElementById('dev-json').innerText = JSON.stringify(stats, null, 2);
+    }
+</script>
+
+</body>
+</html>

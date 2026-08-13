@@ -4,8 +4,10 @@ import uuid
 from .schema import TestSpec, TestResult, ExecutionMetadata, EvaluationResult, EvaluationFailure, SessionResult, TurnResult, TurnSpec
 from .metadata import get_git_info, hash_string, hash_dict
 from .evaluator import Evaluator
-from models.provider import BaseProvider, ProviderError
+from models.provider import BaseProvider, ProviderError, ProviderErrorType, UsageMetrics
 from core.taxonomy import FailureTag, RootCause, Severity
+from core.pricing import UsageRecord, PricingEngine
+import dataclasses
 
 class TestRunner:
     def __init__(self, provider: BaseProvider, evaluator: Evaluator):
@@ -17,6 +19,8 @@ class TestRunner:
         
         # 1. Send scenario to AI
         print(" -> Generating AI response...")
+        provider_status = "SUCCESS"
+        
         try:
             provider_response = self.provider.generate_response(spec.scenario)
             ai_response_text = provider_response.content
@@ -26,8 +30,9 @@ class TestRunner:
             evaluation = self.evaluator.evaluate(spec, ai_response_text)
             
         except ProviderError as e:
-            print(f" -> Provider Error: {e.error_type.value}")
-            ai_response_text = f"[{e.error_type.value}] {e.message}"
+            provider_status = e.error_type.value
+            print(f" -> Provider Error: {provider_status}")
+            ai_response_text = f"[{provider_status}] {e.message}"
             provider_response = None
             
             # Create a synthetic evaluation failure so it doesn't get lost,
@@ -52,12 +57,32 @@ class TestRunner:
         judge_model = "unknown"
         judge_prompt_hash = "unknown"
         
+        usage_records = []
+        if provider_response and provider_response.usage:
+            gen_usage = UsageRecord.from_response(
+                role="generation",
+                provider=provider_response.provider,
+                model=provider_response.model,
+                usage=provider_response.usage
+            )
+            usage_records.append(dataclasses.asdict(gen_usage))
+        
         for layer in evaluation.layer_evaluations:
             if layer.layer_name == "llm_judge" and layer.metadata:
                 judge_provider = layer.metadata.get("judge_provider", "unknown")
                 judge_model = layer.metadata.get("judge_model", "unknown")
                 # We could hash the prompt here or track prompt version
                 judge_prompt_hash = hash_string(layer.metadata.get("prompt_template", "unknown"))
+                
+                judge_usage_dict = layer.metadata.get("usage")
+                if judge_usage_dict:
+                    judge_usage = UsageRecord.from_response(
+                        role="judge",
+                        provider=judge_provider,
+                        model=judge_model,
+                        usage=UsageMetrics(**judge_usage_dict)
+                    )
+                    usage_records.append(dataclasses.asdict(judge_usage))
         
         metadata = ExecutionMetadata(
             git_commit=git_commit,
@@ -80,7 +105,10 @@ class TestRunner:
             ai_response=ai_response_text,
             evaluation=evaluation,
             metadata=metadata,
-            timestamp=time.time()
+            timestamp=time.time(),
+            usage_json={"records": usage_records},
+            provider_status=provider_status,
+            attempt_number=1
         )
         
         return result
@@ -156,6 +184,8 @@ class TestRunner:
             print(f" -> Turn {turn_number}: User Input...")
             user_input = turn_spec.user_input
             
+            
+            provider_status = "SUCCESS"
             # 1. Send input with history
             try:
                 # Some providers like venice and gemini support history. Mock does too now.
@@ -180,8 +210,9 @@ class TestRunner:
                 evaluation = self.evaluator.evaluate(temp_spec, ai_response_text)
                 
             except ProviderError as e:
-                print(f" -> Provider Error: {e.error_type.value}")
-                ai_response_text = f"[{e.error_type.value}] {e.message}"
+                provider_status = e.error_type.value
+                print(f" -> Provider Error: {provider_status}")
+                ai_response_text = f"[{provider_status}] {e.message}"
                 provider_response = None
                 evaluation = EvaluationResult(
                     passed=False,
@@ -196,13 +227,40 @@ class TestRunner:
                     reasoning="Test aborted due to provider error."
                 )
             
+            turn_usage_records = []
+            if provider_response and provider_response.usage:
+                gen_usage = UsageRecord.from_response(
+                    role="generation",
+                    provider=provider_response.provider,
+                    model=provider_response.model,
+                    usage=provider_response.usage
+                )
+                turn_usage_records.append(dataclasses.asdict(gen_usage))
+            
+            for layer in evaluation.layer_evaluations:
+                if layer.layer_name == "llm_judge" and layer.metadata:
+                    judge_provider = layer.metadata.get("judge_provider", "unknown")
+                    judge_model = layer.metadata.get("judge_model", "unknown")
+                    judge_usage_dict = layer.metadata.get("usage")
+                    if judge_usage_dict:
+                        judge_usage = UsageRecord.from_response(
+                            role="judge",
+                            provider=judge_provider,
+                            model=judge_model,
+                            usage=UsageMetrics(**judge_usage_dict)
+                        )
+                        turn_usage_records.append(dataclasses.asdict(judge_usage))
+                        
             turns.append(TurnResult(
                 turn_id=str(uuid.uuid4()),
                 turn_number=turn_number,
                 user_input=user_input,
                 ai_response=ai_response_text,
                 evaluation=evaluation,
-                timestamp=time.time()
+                timestamp=time.time(),
+                usage_json={"records": turn_usage_records},
+                provider_status=provider_status,
+                attempt_number=1
             ))
             turn_number += 1
             
@@ -235,6 +293,19 @@ class TestRunner:
             judge_prompt_hash=judge_prompt_hash
         )
         
+        session_usage_records = []
+        # Pull usage from session level judge if any
+        if final_evaluation.trajectory:
+            session_judge_usage_dict = final_evaluation.session_metadata.get("usage")
+            if session_judge_usage_dict:
+                judge_usage = UsageRecord.from_response(
+                    role="judge",
+                    provider=final_evaluation.session_metadata.get("judge_provider", "unknown"),
+                    model=final_evaluation.session_metadata.get("judge_model", "unknown"),
+                    usage=UsageMetrics(**session_judge_usage_dict)
+                )
+                session_usage_records.append(dataclasses.asdict(judge_usage))
+            
         return SessionResult(
             session_id=session_id,
             test_id=spec.test_id,
@@ -242,7 +313,10 @@ class TestRunner:
             turns=turns,
             final_evaluation=final_evaluation,
             metadata=metadata,
-            timestamp=time.time()
+            timestamp=time.time(),
+            usage_json={"records": session_usage_records},
+            provider_status="SUCCESS",
+            attempt_number=1
         )
 
     def print_session_report(self, session: SessionResult):

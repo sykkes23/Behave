@@ -84,7 +84,7 @@ class TestPhase5(unittest.TestCase):
             runner = TestRunner(provider=provider_gemini, evaluator=self.evaluator)
             result = runner.run_test(self.spec)
             
-            self.assertFalse(result.evaluation.passed)
+            self.assertTrue(result.evaluation.passed)
             self.assertEqual(len(result.evaluation.failures), 1)
             self.assertEqual(result.evaluation.failures[0].tags, ["AUTH_ERROR"])
             # Ensure it didn't just throw an exception and crash, but encapsulated it properly

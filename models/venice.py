@@ -4,7 +4,7 @@ import urllib.error
 import time
 from typing import Dict, Any
 
-from .provider import BaseProvider, ProviderResponse, ProviderError, ProviderErrorType, ProviderConfig
+from .provider import BaseProvider, ProviderResponse, ProviderError, ProviderErrorType, ProviderConfig, UsageMetrics
 
 class VeniceProvider(BaseProvider):
     def __init__(self, config: ProviderConfig):
@@ -40,11 +40,16 @@ class VeniceProvider(BaseProvider):
         req.add_header('Content-Type', 'application/json')
         req.add_header('Authorization', f'Bearer {self.api_key}')
         
-        start_time = time.time()
+        start_time = time.monotonic()
         
+        def sanitize(text: str) -> str:
+            if self.api_key and self.api_key in text:
+                return text.replace(self.api_key, "***SANITIZED***")
+            return text
+            
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
-                latency_ms = (time.time() - start_time) * 1000
+                latency_ms = (time.monotonic() - start_time) * 1000
                 response_data = json.loads(response.read().decode('utf-8'))
                 
                 content = response_data['choices'][0]['message']['content']
@@ -62,15 +67,18 @@ class VeniceProvider(BaseProvider):
                     model=model_used,
                     content=content,
                     request_id=request_id,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    total_tokens=total_tokens,
-                    latency_ms=latency_ms,
+                    usage=UsageMetrics(
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        total_tokens=total_tokens,
+                        latency_ms=latency_ms,
+                        time_to_first_token_ms=None
+                    ),
                     model_version="unknown" # Typically not provided separately in OpenAI spec
                 )
                 
         except urllib.error.HTTPError as e:
-            err_body = e.read().decode('utf-8')
+            err_body = sanitize(e.read().decode('utf-8'))
             if e.code == 401 or e.code == 403:
                 raise ProviderError(ProviderErrorType.AUTH_ERROR, f"Authentication failed: {err_body}")
             elif e.code == 429:
@@ -82,6 +90,6 @@ class VeniceProvider(BaseProvider):
         except urllib.error.URLError as e:
             if isinstance(e.reason, TimeoutError):
                 raise ProviderError(ProviderErrorType.TIMEOUT, "Request to Venice timed out.")
-            raise ProviderError(ProviderErrorType.PROVIDER_ERROR, f"Network error: {str(e)}")
+            raise ProviderError(ProviderErrorType.PROVIDER_ERROR, f"Network error: {sanitize(str(e))}")
         except Exception as e:
-            raise ProviderError(ProviderErrorType.UNKNOWN_PROVIDER_ERROR, f"Unexpected error: {str(e)}")
+            raise ProviderError(ProviderErrorType.UNKNOWN_PROVIDER_ERROR, f"Unexpected error: {sanitize(str(e))}")

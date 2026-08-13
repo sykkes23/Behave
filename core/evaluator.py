@@ -174,12 +174,14 @@ class Evaluator:
         trajectory = None
         evidence_timeline = []
         reasoning = "Session evaluated based on aggregation of turn results."
+        session_metadata = {}
         
         if isinstance(self.llm_judge_provider, LLMJudge):
-            traj, reason, timeline, _ = self.llm_judge_provider.evaluate_session(spec, turns)
+            traj, reason, timeline, meta = self.llm_judge_provider.evaluate_session(spec, turns)
             trajectory = traj
             evidence_timeline = timeline
             reasoning = reason
+            session_metadata = meta
         
         return EvaluationResult(
             passed=final_passed,
@@ -192,5 +194,6 @@ class Evaluator:
             critical_failure=critical_failure,
             critical_failure_count=critical_count,
             severity_counts=sev_counts,
-            score_breakdown=breakdown
+            score_breakdown=breakdown,
+            session_metadata=session_metadata
         )

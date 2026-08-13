@@ -24,7 +24,10 @@ def init_db():
                 human_reason TEXT,
                 review_timestamp REAL,
                 metadata_json TEXT,
-                layer_evaluations_json TEXT
+                layer_evaluations_json TEXT,
+                usage_json TEXT,
+                provider_status TEXT,
+                attempt_number INTEGER
             )
         ''')
         
@@ -36,7 +39,10 @@ def init_db():
                 test_version TEXT,
                 final_evaluation_json TEXT,
                 metadata_json TEXT,
-                timestamp REAL
+                timestamp REAL,
+                usage_json TEXT,
+                provider_status TEXT,
+                attempt_number INTEGER
             )
         ''')
         
@@ -52,6 +58,9 @@ def init_db():
                 human_verdict TEXT,
                 human_reason TEXT,
                 review_timestamp REAL,
+                usage_json TEXT,
+                provider_status TEXT,
+                attempt_number INTEGER,
                 FOREIGN KEY(session_id) REFERENCES test_sessions(session_id)
             )
         ''')
@@ -87,13 +96,26 @@ def save_test_result(result: TestResult):
             cursor.execute('ALTER TABLE test_runs ADD COLUMN layer_evaluations_json TEXT')
         except sqlite3.OperationalError:
             pass
+        try:
+            cursor.execute('ALTER TABLE test_runs ADD COLUMN usage_json TEXT')
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute('ALTER TABLE test_runs ADD COLUMN provider_status TEXT')
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute('ALTER TABLE test_runs ADD COLUMN attempt_number INTEGER')
+        except sqlite3.OperationalError:
+            pass
 
         cursor.execute('''
             INSERT INTO test_runs (
                 run_id, test_id, test_version, ai_response, auto_passed, score,
                 failures_json, reasoning, timestamp,
-                human_verdict, human_reason, review_timestamp, metadata_json, layer_evaluations_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                human_verdict, human_reason, review_timestamp, metadata_json, layer_evaluations_json,
+                usage_json, provider_status, attempt_number
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             result.run_id,
             result.test_id,
@@ -108,7 +130,10 @@ def save_test_result(result: TestResult):
             result.evaluation.human_reason,
             result.evaluation.review_timestamp,
             metadata_json,
-            layer_evaluations_json
+            layer_evaluations_json,
+            json.dumps(result.usage_json),
+            result.provider_status,
+            result.attempt_number
         ))
         conn.commit()
 
@@ -153,6 +178,9 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
         review_timestamp = row_dict.get("review_timestamp", None)
         metadata_json = row_dict.get("metadata_json", None)
         layer_evaluations_json = row_dict.get("layer_evaluations_json") or "[]"
+        usage_json = row_dict.get("usage_json", "{}")
+        provider_status = row_dict.get("provider_status", "SUCCESS")
+        attempt_number = row_dict.get("attempt_number", 1)
         
         failures_data = json.loads(failures_json)
         failures = []
@@ -211,7 +239,10 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
             ai_response=ai_response,
             evaluation=evaluation,
             metadata=metadata,
-            timestamp=timestamp
+            timestamp=timestamp,
+            usage_json=json.loads(usage_json) if usage_json and usage_json.strip() else {},
+            provider_status=provider_status,
+            attempt_number=attempt_number
         )
 
 def _serialize_evaluation(evaluation: EvaluationResult) -> str:
@@ -236,6 +267,7 @@ def _serialize_evaluation(evaluation: EvaluationResult) -> str:
         "critical_failure_count": evaluation.critical_failure_count,
         "severity_counts": evaluation.severity_counts,
         "score_breakdown": evaluation.score_breakdown,
+        "session_metadata": evaluation.session_metadata,
         "human_verdict": evaluation.human_verdict,
         "human_reason": evaluation.human_reason,
         "review_timestamp": evaluation.review_timestamp
@@ -277,6 +309,7 @@ def _deserialize_evaluation(json_str: str) -> EvaluationResult:
         critical_failure_count=data.get("critical_failure_count", 0),
         severity_counts=data.get("severity_counts", {}),
         score_breakdown=data.get("score_breakdown", {}),
+        session_metadata=data.get("session_metadata", {}),
         human_verdict=data.get("human_verdict"),
         human_reason=data.get("human_reason"),
         review_timestamp=data.get("review_timestamp")
@@ -289,23 +322,28 @@ def save_session_result(session: SessionResult):
         
         cursor.execute('''
             INSERT INTO test_sessions (
-                session_id, test_id, test_version, final_evaluation_json, metadata_json, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                session_id, test_id, test_version, final_evaluation_json, metadata_json, timestamp,
+                usage_json, provider_status, attempt_number
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             session.session_id,
             session.test_id,
             session.test_version,
             _serialize_evaluation(session.final_evaluation),
             json.dumps(dataclasses.asdict(session.metadata)),
-            session.timestamp
+            session.timestamp,
+            json.dumps(session.usage_json),
+            session.provider_status,
+            session.attempt_number
         ))
         
         for turn in session.turns:
             cursor.execute('''
                 INSERT INTO test_turns (
                     turn_id, session_id, turn_number, user_input, ai_response,
-                    evaluation_json, timestamp, human_verdict, human_reason, review_timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    evaluation_json, timestamp, human_verdict, human_reason, review_timestamp,
+                    usage_json, provider_status, attempt_number
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 turn.turn_id,
                 session.session_id,
@@ -316,7 +354,10 @@ def save_session_result(session: SessionResult):
                 turn.timestamp,
                 turn.evaluation.human_verdict,
                 turn.evaluation.human_reason,
-                turn.evaluation.review_timestamp
+                turn.evaluation.review_timestamp,
+                json.dumps(turn.usage_json),
+                turn.provider_status,
+                turn.attempt_number
             ))
         conn.commit()
 
@@ -352,7 +393,10 @@ def get_session_result(session_id: str) -> Optional[SessionResult]:
                 user_input=t_dict.get("user_input", ""),
                 ai_response=t_dict.get("ai_response", ""),
                 evaluation=turn_eval,
-                timestamp=t_dict.get("timestamp", 0.0)
+                timestamp=t_dict.get("timestamp", 0.0),
+                usage_json=json.loads(t_dict.get("usage_json", "{}")) if t_dict.get("usage_json") else {},
+                provider_status=t_dict.get("provider_status", "SUCCESS"),
+                attempt_number=t_dict.get("attempt_number", 1)
             ))
             
         meta = ExecutionMetadata()
@@ -366,5 +410,8 @@ def get_session_result(session_id: str) -> Optional[SessionResult]:
             turns=turns,
             final_evaluation=_deserialize_evaluation(s_dict.get("final_evaluation_json", "{}")),
             metadata=meta,
-            timestamp=s_dict.get("timestamp", 0.0)
+            timestamp=s_dict.get("timestamp", 0.0),
+            usage_json=json.loads(s_dict.get("usage_json", "{}")) if s_dict.get("usage_json") else {},
+            provider_status=s_dict.get("provider_status", "SUCCESS"),
+            attempt_number=s_dict.get("attempt_number", 1)
         )

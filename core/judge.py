@@ -3,6 +3,7 @@ from typing import Dict, Any, Tuple
 from core.schema import TestSpec, LayerVerdict, EvaluationFailure
 from core.taxonomy import FailureTag, RootCause, Severity, BehavioralTrajectory
 from models.provider import BaseProvider
+import dataclasses
 
 JUDGE_PROMPT_TEMPLATE = """
 You are a strict, objective, and unbiased AI Evaluation Judge.
@@ -199,12 +200,15 @@ class LLMJudge:
                     "confidence": crit.get("confidence"),
                     "evidence": crit["evidence"]
                 }
-                
-            return layer_verdict, reasoning, failures, criteria_results, {
-                "judge_provider": provider_res.provider,
-                "judge_model": provider_res.model,
-                "judge_model_version": provider_res.model_version
+            
+            metadata_info = {
+                "judge_provider": self.provider.config.provider_name,
+                "judge_model": self.provider.config.model_name,
+                "prompt_template": self.prompt_template,
+                "usage": dataclasses.asdict(provider_res.usage) if hasattr(provider_res, "usage") else {}
             }
+                
+            return layer_verdict, reasoning, failures, criteria_results, metadata_info
             
         except json.JSONDecodeError as e:
             return LayerVerdict.ERROR, f"Judge returned malformed JSON: {str(e)}", [], {}, {}
@@ -266,7 +270,8 @@ class LLMJudge:
                 "judge_provider": provider_res.provider,
                 "judge_model": provider_res.model,
                 "judge_model_version": provider_res.model_version,
-                "prompt_template": SESSION_JUDGE_PROMPT_TEMPLATE.strip()
+                "prompt_template": SESSION_JUDGE_PROMPT_TEMPLATE.strip(),
+                "usage": dataclasses.asdict(provider_res.usage) if hasattr(provider_res, "usage") else {}
             }
             
         except json.JSONDecodeError as e:

@@ -8,7 +8,7 @@ from core.schema import TestSpec, TurnSpec, EvaluationCriterion, SessionResult, 
 from core.evaluator import Evaluator
 from core.test_runner import TestRunner
 from core.judge import LLMJudge
-from models.provider import BaseProvider, ProviderResponse, ProviderConfig, ProviderError, ProviderErrorType
+from models.provider import BaseProvider, ProviderResponse, ProviderConfig, ProviderError, ProviderErrorType, UsageMetrics
 from database.sqlite import init_db, DB_PATH, save_session_result, get_session_result
 
 class MockSessionJudgeProvider(BaseProvider):
@@ -27,10 +27,7 @@ class MockSessionJudgeProvider(BaseProvider):
             provider="mock_session_judge",
             model="mock_model",
             content=self.response_json,
-            input_tokens=10,
-            output_tokens=10,
-            total_tokens=20,
-            latency_ms=100
+            usage=UsageMetrics(input_tokens=10, output_tokens=10, total_tokens=20, latency_ms=100)
         )
 
 class TestPhase9(unittest.TestCase):

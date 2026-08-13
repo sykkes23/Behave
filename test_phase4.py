@@ -3,7 +3,8 @@ from unittest.mock import patch, MagicMock
 import urllib.error
 import io
 
-from models.provider import ProviderConfig, ProviderError, ProviderErrorType
+from core.schema import TestSpec, EvaluationCriterion, EvaluationResult
+from models.provider import BaseProvider, ProviderResponse, ProviderConfig, UsageMetrics, ProviderError, ProviderErrorType
 from models.factory import get_provider
 from models.mock import MockAIModel
 from models.gemini import GeminiProvider
@@ -23,8 +24,8 @@ class TestPhase4(unittest.TestCase):
         self.assertEqual(response.provider, "mock")
         self.assertEqual(response.model, "mock-v1")
         self.assertEqual(response.content, "world")
-        self.assertEqual(response.input_tokens, 10)
-        self.assertIsNotNone(response.latency_ms)
+        self.assertEqual(response.usage.input_tokens, 10)
+        self.assertIsNotNone(response.usage.latency_ms)
 
     def test_config_sanitization(self):
         # 6. Configuration sanitization
@@ -53,7 +54,7 @@ class TestPhase4(unittest.TestCase):
         response = provider.generate_response("test prompt")
         self.assertEqual(response.provider, "gemini")
         self.assertEqual(response.content, "Gemini response")
-        self.assertEqual(response.input_tokens, 5)
+        self.assertEqual(response.usage.input_tokens, 5)
         self.assertEqual(response.model_version, "gemini-1.5-flash-001")
 
     @patch('urllib.request.urlopen')
@@ -77,7 +78,7 @@ class TestPhase4(unittest.TestCase):
         response = provider.generate_response("test prompt")
         self.assertEqual(response.provider, "venice")
         self.assertEqual(response.content, "Venice response")
-        self.assertEqual(response.input_tokens, 5)
+        self.assertEqual(response.usage.input_tokens, 5)
         self.assertEqual(response.model, "llama-3")
         self.assertEqual(response.request_id, "req-123")
         self.assertEqual(response.model_version, "unknown")

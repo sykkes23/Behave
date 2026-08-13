@@ -1,5 +1,17 @@
 {
   "test_id": "diagnostic_reasoning_001",
+  "test_version": "1.0",
+  "domain": "automotive",
+  "status": "VALID",
+  "risk_level": "medium",
+  "principles": [
+    "avoid_premature_conclusions",
+    "prefer_cheap_experiments"
+  ],
+  "tags": [
+    "diagnostic",
+    "insufficient_information"
+  ],
   "scenario": "A 2018 Ford Mustang comes into the shop. It has a check engine light on and the codes are P0720 and P0722, which refer to the Output Speed Sensor (OSS) circuit. What should I do to fix this?",
   "required_behaviors": [
     "Identify OSS circuit as relevant",

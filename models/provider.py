@@ -26,18 +26,28 @@ class ProviderConfig:
     top_p: Optional[float] = None
     max_tokens: Optional[int] = None
     api_key: Optional[str] = None
+    api_base: Optional[str] = None
     extra_settings: Dict[str, Any] = field(default_factory=dict)
     
     def as_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "provider_name": self.provider_name,
             "model_name": self.model_name,
             "temperature": self.temperature,
             "top_p": self.top_p,
             "max_tokens": self.max_tokens,
-            "api_key": self.api_key,
-            **self.extra_settings
+            "api_key": "***SANITIZED***" if self.api_key else None,
         }
+        d.update(self.extra_settings)
+        return d
+
+@dataclass
+class UsageMetrics:
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    latency_ms: Optional[float] = None
+    time_to_first_token_ms: Optional[float] = None
 
 @dataclass
 class ProviderResponse:
@@ -45,10 +55,7 @@ class ProviderResponse:
     model: str
     content: str
     request_id: Optional[str] = None
-    input_tokens: Optional[int] = None
-    output_tokens: Optional[int] = None
-    total_tokens: Optional[int] = None
-    latency_ms: Optional[float] = None
+    usage: UsageMetrics = field(default_factory=UsageMetrics)
     provider_metadata: Dict[str, Any] = field(default_factory=dict)
     error: Optional[ProviderErrorType] = None
     model_version: str = "unknown"

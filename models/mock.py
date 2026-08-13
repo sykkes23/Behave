@@ -1,6 +1,6 @@
 import time
 from typing import Dict, Optional, List
-from .provider import BaseProvider, ProviderResponse, ProviderConfig
+from .provider import BaseProvider, ProviderResponse, UsageMetrics, ProviderConfig
 
 class MockAIModel(BaseProvider):
     def __init__(self, config: ProviderConfig, predefined_responses: Dict[str, str] = None):
@@ -22,9 +22,11 @@ class MockAIModel(BaseProvider):
             provider="mock",
             model=self.config.model_name,
             content=response_text,
-            input_tokens=10,
-            output_tokens=len(response_text.split()),
-            total_tokens=10 + len(response_text.split()),
-            latency_ms=latency,
+            usage=UsageMetrics(
+                input_tokens=10,
+                output_tokens=len(response_text.split()),
+                total_tokens=10 + len(response_text.split()),
+                latency_ms=latency
+            ),
             model_version="mock-v1"
         )

@@ -4,7 +4,7 @@ import urllib.error
 import time
 from typing import Dict, Any
 
-from .provider import BaseProvider, ProviderResponse, ProviderError, ProviderErrorType, ProviderConfig
+from .provider import BaseProvider, ProviderResponse, ProviderError, ProviderErrorType, ProviderConfig, UsageMetrics
 
 class GeminiProvider(BaseProvider):
     def __init__(self, config: ProviderConfig):
@@ -41,11 +41,16 @@ class GeminiProvider(BaseProvider):
         req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), method='POST')
         req.add_header('Content-Type', 'application/json')
         
-        start_time = time.time()
+        start_time = time.monotonic()
         
+        def sanitize(text: str) -> str:
+            if self.api_key and self.api_key in text:
+                return text.replace(self.api_key, "***SANITIZED***")
+            return text
+            
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
-                latency_ms = (time.time() - start_time) * 1000
+                latency_ms = (time.monotonic() - start_time) * 1000
                 response_data = json.loads(response.read().decode('utf-8'))
                 
                 content = response_data['candidates'][0]['content']['parts'][0]['text']
@@ -61,14 +66,17 @@ class GeminiProvider(BaseProvider):
                     model=self.model,
                     model_version=model_version,
                     content=content,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    total_tokens=total_tokens,
-                    latency_ms=latency_ms
+                    usage=UsageMetrics(
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        total_tokens=total_tokens,
+                        latency_ms=latency_ms,
+                        time_to_first_token_ms=None
+                    )
                 )
                 
         except urllib.error.HTTPError as e:
-            err_body = e.read().decode('utf-8')
+            err_body = sanitize(e.read().decode('utf-8'))
             if e.code == 401 or e.code == 403:
                 raise ProviderError(ProviderErrorType.AUTH_ERROR, f"Authentication failed: {err_body}")
             elif e.code == 429:
@@ -80,6 +88,6 @@ class GeminiProvider(BaseProvider):
         except urllib.error.URLError as e:
             if isinstance(e.reason, TimeoutError):
                 raise ProviderError(ProviderErrorType.TIMEOUT, "Request to Gemini timed out.")
-            raise ProviderError(ProviderErrorType.PROVIDER_ERROR, f"Network error: {str(e)}")
+            raise ProviderError(ProviderErrorType.PROVIDER_ERROR, f"Network error: {sanitize(str(e))}")
         except Exception as e:
-            raise ProviderError(ProviderErrorType.UNKNOWN_PROVIDER_ERROR, f"Unexpected error: {str(e)}")
+            raise ProviderError(ProviderErrorType.UNKNOWN_PROVIDER_ERROR, f"Unexpected error: {sanitize(str(e))}")

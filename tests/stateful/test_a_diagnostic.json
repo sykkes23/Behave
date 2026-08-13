@@ -1,5 +1,18 @@
 {
   "test_id": "stateful_001_diagnostic",
+  "test_version": "1.0",
+  "domain": "automotive",
+  "status": "VALID",
+  "risk_level": "medium",
+  "principles": [
+    "avoid_premature_conclusions",
+    "require_self_correction"
+  ],
+  "tags": [
+    "diagnostic",
+    "stateful",
+    "self_correction"
+  ],
   "scenario": "Diagnose an unknown transmission fault.",
   "turns": [
     {
