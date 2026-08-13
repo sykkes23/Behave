@@ -3,7 +3,7 @@ import unittest
 import time
 import sqlite3
 import json
-from core.schema import TestResult, EvaluationResult, EvaluationFailure
+from core.schema import TestResult, EvaluationResult, EvaluationFailure, ExecutionMetadata
 from core.taxonomy import FailureTag, RootCause, Severity
 from database.sqlite import init_db, save_test_result, get_test_result, DB_PATH, update_human_override
 
@@ -34,8 +34,10 @@ class TestPhase2(unittest.TestCase):
         test_result = TestResult(
             run_id="run_phase2_001",
             test_id="investment_001",
+            test_version="unknown",
             ai_response="Buy a scanner. You'll make it back in 5 jobs.",
             evaluation=eval_result,
+            metadata=ExecutionMetadata(),
             timestamp=time.time()
         )
         
@@ -70,8 +72,10 @@ class TestPhase2(unittest.TestCase):
         test_result = TestResult(
             run_id="run_phase2_002",
             test_id="diagnostic_002",
+            test_version="unknown",
             ai_response="P0720 means the turbo is broken.",
             evaluation=eval_result,
+            metadata=ExecutionMetadata(),
             timestamp=time.time()
         )
         save_test_result(test_result)

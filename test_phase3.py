@@ -7,6 +7,7 @@ from core.schema import TestSpec, TestResult, EvaluationResult, EvaluationFailur
 from core.test_runner import TestRunner
 from core.evaluator import Evaluator
 from models.mock import MockAIModel
+from models.provider import ProviderConfig
 from core.metadata import sanitize_config, hash_dict, hash_string, get_git_info
 from database.sqlite import init_db, save_test_result, get_test_result, DB_PATH, update_human_override
 
@@ -15,9 +16,10 @@ class TestPhase3(unittest.TestCase):
         if os.path.exists(DB_PATH):
             os.remove(DB_PATH)
         init_db()
-        self.ai_model = MockAIModel()
+        config = ProviderConfig(provider_name="mock", model_name="mock-v1")
+        self.ai_model = MockAIModel(config=config)
         self.evaluator = Evaluator()
-        self.runner = TestRunner(ai_model=self.ai_model, evaluator=self.evaluator)
+        self.runner = TestRunner(provider=self.ai_model, evaluator=self.evaluator)
         
         self.spec = TestSpec(
             test_id="test_003",

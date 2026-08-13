@@ -1,14 +1,15 @@
 import json
 import time
 import uuid
-from .schema import TestSpec, TestResult, ExecutionMetadata
+from .schema import TestSpec, TestResult, ExecutionMetadata, EvaluationResult, EvaluationFailure
 from .metadata import get_git_info, hash_string, hash_dict
 from .evaluator import Evaluator
-from models.base import BaseAIModel
+from models.provider import BaseProvider, ProviderError
+from core.taxonomy import FailureTag, RootCause, Severity
 
 class TestRunner:
-    def __init__(self, ai_model: BaseAIModel, evaluator: Evaluator):
-        self.ai_model = ai_model
+    def __init__(self, provider: BaseProvider, evaluator: Evaluator):
+        self.provider = provider
         self.evaluator = evaluator
 
     def run_test(self, spec: TestSpec) -> TestResult:
@@ -16,22 +17,45 @@ class TestRunner:
         
         # 1. Send scenario to AI
         print(" -> Generating AI response...")
-        ai_response = self.ai_model.generate_response(spec.scenario)
-        
-        # 2. Evaluate response
-        print(" -> Evaluating response...")
-        evaluation = self.evaluator.evaluate(spec, ai_response)
+        try:
+            provider_response = self.provider.generate_response(spec.scenario)
+            ai_response_text = provider_response.content
+            
+            # 2. Evaluate response
+            print(" -> Evaluating response...")
+            evaluation = self.evaluator.evaluate(spec, ai_response_text)
+            
+        except ProviderError as e:
+            print(f" -> Provider Error: {e.error_type.value}")
+            ai_response_text = f"[{e.error_type.value}] {e.message}"
+            provider_response = None
+            
+            # Create a synthetic evaluation failure so it doesn't get lost,
+            # but mark it distinctly as an infrastructure error, not an AI behavioral failure.
+            evaluation = EvaluationResult(
+                passed=False,
+                score=0.0,
+                failures=[EvaluationFailure(
+                    tags=[e.error_type.value],
+                    root_cause=RootCause.UNKNOWN.value,
+                    observed_behavior=e.message,
+                    expected_behavior="Valid API response",
+                    severity=Severity.CRITICAL.value
+                )],
+                reasoning="Test aborted due to provider error."
+            )
         
         # 3. Build Metadata
         git_commit, git_dirty = get_git_info()
-        # Mock configuration for now (to demonstrate hashing)
-        dummy_config = {"temperature": 0.7, "GEMINI_API_KEY": "secret123"}
         
         metadata = ExecutionMetadata(
             git_commit=git_commit,
             git_dirty=git_dirty,
             system_prompt_hash=hash_string("You are a helpful automotive assistant."), # Mock system prompt
-            configuration_hash=hash_dict(dummy_config)
+            configuration_hash=hash_dict(self.provider.config.as_dict()),
+            provider=provider_response.provider if provider_response else self.provider.config.provider_name,
+            model=provider_response.model if provider_response else self.provider.config.model_name,
+            model_version=provider_response.model_version if provider_response else "unknown"
         )
         
         # 4. Create Result
@@ -39,7 +63,7 @@ class TestRunner:
             run_id=str(uuid.uuid4()),
             test_id=spec.test_id,
             test_version=spec.test_version,
-            ai_response=ai_response,
+            ai_response=ai_response_text,
             evaluation=evaluation,
             metadata=metadata,
             timestamp=time.time()

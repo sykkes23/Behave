@@ -1,7 +1,7 @@
 import os
 import unittest
 import time
-from core.schema import TestSpec, TestResult, EvaluationResult, EvaluationFailure
+from core.schema import TestSpec, TestResult, EvaluationResult, EvaluationFailure, ExecutionMetadata
 from database.sqlite import init_db, save_test_result, get_test_result, update_human_override, DB_PATH
 
 class TestPhase1(unittest.TestCase):
@@ -26,8 +26,10 @@ class TestPhase1(unittest.TestCase):
         test_result = TestResult(
             run_id="test_run_123",
             test_id="diagnostic_001",
+            test_version="unknown",
             ai_response="Replace the sensor.",
             evaluation=eval_result,
+            metadata=ExecutionMetadata(),
             timestamp=time.time()
         )
         
