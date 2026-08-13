@@ -20,7 +20,7 @@ class TestPhase1(unittest.TestCase):
         eval_result = EvaluationResult(
             passed=False,
             score=50.0,
-            failures=[EvaluationFailure("Premature Conclusion", "observed", "expected", "Medium")],
+            failures=[EvaluationFailure(tags=["Premature Conclusion"], root_cause="unknown", observed_behavior="observed", expected_behavior="expected", severity="Medium")],
             reasoning="Failed due to premature conclusion."
         )
         test_result = TestResult(

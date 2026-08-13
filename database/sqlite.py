@@ -29,7 +29,8 @@ def save_test_result(result: TestResult):
     init_db()
     
     failures_json = json.dumps([{
-        "category": f.category,
+        "tags": f.tags,
+        "root_cause": f.root_cause,
         "observed_behavior": f.observed_behavior,
         "expected_behavior": f.expected_behavior,
         "severity": f.severity
@@ -84,7 +85,13 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
         test_id, ai_response, auto_passed, score, failures_json, reasoning, timestamp, human_verdict, human_reason, review_timestamp = row
         
         failures_data = json.loads(failures_json)
-        failures = [EvaluationFailure(**f) for f in failures_data]
+        failures = []
+        for f in failures_data:
+            # Backward compatibility with Phase 1
+            if "category" in f:
+                f["tags"] = [f.pop("category")]
+                f["root_cause"] = "unknown"
+            failures.append(EvaluationFailure(**f))
         
         evaluation = EvaluationResult(
             passed=bool(auto_passed),

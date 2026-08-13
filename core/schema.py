@@ -11,7 +11,8 @@ class TestSpec:
 
 @dataclass
 class EvaluationFailure:
-    category: str
+    tags: List[str]          # Multi-tag taxonomy (e.g., ["unsupported_assumption"])
+    root_cause: str          # Why it happened (e.g., "reasoning_error")
     observed_behavior: str
     expected_behavior: str
     severity: str

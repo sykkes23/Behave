@@ -51,7 +51,10 @@ class TestRunner:
         if not result.evaluation.passed and result.evaluation.failures:
             print("\nFailures Detected:")
             for f in result.evaluation.failures:
-                print(f"  - Category: {f.category}")
+                tags = ", ".join(f.tags) if hasattr(f, 'tags') else "unknown"
+                root_cause = getattr(f, 'root_cause', 'unknown')
+                print(f"  - Tags: {tags}")
+                print(f"    Root Cause: {root_cause}")
                 print(f"    Severity: {f.severity}")
                 print(f"    Expected: {f.expected_behavior}")
                 print(f"    Observed: {f.observed_behavior}\n")
