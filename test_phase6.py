@@ -103,8 +103,8 @@ class TestPhase6(unittest.TestCase):
         self.assertEqual(llm_layer.verdict, LayerVerdict.ERROR)
         self.assertTrue("malformed" in llm_layer.reasoning.lower())
         
-        # An ERROR layer fails the overall evaluation for safety
-        self.assertFalse(result.passed)
+        # An ERROR layer no longer fails the overall behavioral evaluation (Phase 10)
+        self.assertTrue(result.passed)
 
     def test_db_persistence(self):
         evaluator = Evaluator()

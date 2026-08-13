@@ -220,7 +220,8 @@ def _serialize_evaluation(evaluation: EvaluationResult) -> str:
         "root_cause": f.root_cause,
         "observed_behavior": f.observed_behavior,
         "expected_behavior": f.expected_behavior,
-        "severity": f.severity
+        "severity": f.severity,
+        "is_critical": f.is_critical
     } for f in evaluation.failures]
     layer_evaluations = [dataclasses.asdict(l) for l in evaluation.layer_evaluations]
     return json.dumps({
@@ -231,6 +232,10 @@ def _serialize_evaluation(evaluation: EvaluationResult) -> str:
         "layer_evaluations": layer_evaluations,
         "trajectory": evaluation.trajectory,
         "evidence_timeline": evaluation.evidence_timeline,
+        "critical_failure": evaluation.critical_failure,
+        "critical_failure_count": evaluation.critical_failure_count,
+        "severity_counts": evaluation.severity_counts,
+        "score_breakdown": evaluation.score_breakdown,
         "human_verdict": evaluation.human_verdict,
         "human_reason": evaluation.human_reason,
         "review_timestamp": evaluation.review_timestamp
@@ -268,6 +273,10 @@ def _deserialize_evaluation(json_str: str) -> EvaluationResult:
         layer_evaluations=layer_evals,
         trajectory=data.get("trajectory"),
         evidence_timeline=data.get("evidence_timeline", []),
+        critical_failure=data.get("critical_failure", False),
+        critical_failure_count=data.get("critical_failure_count", 0),
+        severity_counts=data.get("severity_counts", {}),
+        score_breakdown=data.get("score_breakdown", {}),
         human_verdict=data.get("human_verdict"),
         human_reason=data.get("human_reason"),
         review_timestamp=data.get("review_timestamp")

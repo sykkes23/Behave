@@ -115,7 +115,8 @@ class TestPhase8(unittest.TestCase):
         # Turn should have failed with the error
         self.assertFalse(result.turns[0].evaluation.passed)
         self.assertIn("AUTH_ERROR", [f.tags[0] for f in result.turns[0].evaluation.failures])
-        self.assertFalse(result.final_evaluation.passed)
+        # In Phase 10, provider errors don't fail the behavioral evaluation
+        self.assertTrue(result.final_evaluation.passed)
         
     def test_database_persistence_and_human_override(self):
         # 14, 15, 16. DB persistence and human override on an individual turn

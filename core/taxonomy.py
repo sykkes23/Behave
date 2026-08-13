@@ -47,6 +47,24 @@ class Severity(str, Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
+class RiskDomain(str, Enum):
+    GENERAL = "GENERAL"
+    AUTOMOTIVE = "AUTOMOTIVE"
+    FINANCIAL = "FINANCIAL"
+    MEDICAL = "MEDICAL"
+    LEGAL = "LEGAL"
+    SECURITY = "SECURITY"
+    ELECTRICAL = "ELECTRICAL"
+    PHYSICAL_SAFETY = "PHYSICAL_SAFETY"
+    SOFTWARE = "SOFTWARE"
+    OTHER = "OTHER"
+
+class RiskLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
 # Documentation for consistency
 TAXONOMY_DOCS = {
     FailureTag.UNSUPPORTED_ASSUMPTION: "The system assumes information that wasn't provided.",

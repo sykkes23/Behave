@@ -1,11 +1,15 @@
 import json
 from .schema import TestSpec, EvaluationResult, EvaluationFailure, LayerEvaluation, LayerVerdict, TurnResult
-from .taxonomy import FailureTag, RootCause, Severity
+from .taxonomy import FailureTag, RootCause, Severity, BehavioralTrajectory
 from .judge import LLMJudge
+from .critical_policy import CriticalPolicyEngine
+from .scoring import ScoringEngine
 
 class Evaluator:
     def __init__(self, llm_judge_provider=None):
         self.llm_judge_provider = llm_judge_provider
+        self.critical_policy = CriticalPolicyEngine()
+        self.scoring_engine = ScoringEngine()
 
     def evaluate(self, spec: TestSpec, ai_response: str) -> EvaluationResult:
         layer_evaluations = []
@@ -120,22 +124,32 @@ class Evaluator:
         # If any layer failed (and isn't just UNCERTAIN), the final result is FAIL.
         # UNCERTAIN doesn't automatically fail the test. ERROR fails the test.
         
-        final_passed = True
         all_failures = []
+        provider_errors = 0
         for layer in layer_evaluations:
             all_failures.extend(layer.failures)
-            if layer.verdict in [LayerVerdict.FAIL, LayerVerdict.ERROR]:
-                final_passed = False
+            if layer.verdict == LayerVerdict.ERROR:
+                provider_errors += 1
 
-        score = 100.0 if final_passed else max(0.0, 100.0 - (len(all_failures) * 25.0))
+        # 1. Apply Critical Policy
+        all_failures = self.critical_policy.evaluate(spec, all_failures)
         
-        # We store the unique failures across layers, or just keep them all. Let's keep them all for full auditability.
+        # 2. Score
+        final_passed, score, breakdown, sev_counts = self.scoring_engine.score(spec, all_failures, provider_errors)
+        
+        critical_failure = breakdown.get("critical_override", False)
+        critical_count = sev_counts.get(Severity.CRITICAL.value, 0)
+        
         return EvaluationResult(
             passed=final_passed,
             score=score,
             failures=all_failures,
-            reasoning=f"Final automatic verdict based on {len(layer_evaluations)} layers.",
-            layer_evaluations=layer_evaluations
+            reasoning=breakdown.get("final_verdict_reason", ""),
+            layer_evaluations=layer_evaluations,
+            critical_failure=critical_failure,
+            critical_failure_count=critical_count,
+            severity_counts=sev_counts,
+            score_breakdown=breakdown
         )
 
     def evaluate_session(self, spec: TestSpec, turns: list[TurnResult]) -> EvaluationResult:
@@ -143,15 +157,19 @@ class Evaluator:
         This aggregates failures across turns and can eventually run a session-level LLM judge."""
         
         all_failures = []
-        any_turn_failed = False
-        
+        provider_errors = 0
         for turn in turns:
-            if not turn.evaluation.passed:
-                any_turn_failed = True
             all_failures.extend(turn.evaluation.failures)
+            if turn.evaluation.score_breakdown.get("provider_errors_ignored", 0) > 0:
+                provider_errors += 1
             
-        passed = not any_turn_failed
-        score = sum([t.evaluation.score for t in turns]) / len(turns) if turns else 100.0
+        # Re-evaluate critical policy across all failures
+        all_failures = self.critical_policy.evaluate(spec, all_failures)
+        
+        # Score session
+        final_passed, score, breakdown, sev_counts = self.scoring_engine.score(spec, all_failures, provider_errors)
+        critical_failure = breakdown.get("critical_override", False)
+        critical_count = sev_counts.get(Severity.CRITICAL.value, 0)
         
         trajectory = None
         evidence_timeline = []
@@ -164,11 +182,15 @@ class Evaluator:
             reasoning = reason
         
         return EvaluationResult(
-            passed=passed,
+            passed=final_passed,
             score=score,
             failures=all_failures,
             reasoning=reasoning,
             trajectory=trajectory,
             evidence_timeline=evidence_timeline,
-            layer_evaluations=[]
+            layer_evaluations=[],
+            critical_failure=critical_failure,
+            critical_failure_count=critical_count,
+            severity_counts=sev_counts,
+            score_breakdown=breakdown
         )

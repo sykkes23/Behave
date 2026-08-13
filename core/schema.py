@@ -24,6 +24,8 @@ class TestSpec:
     required_behaviors: List[str] = field(default_factory=list)
     forbidden_behaviors: List[str] = field(default_factory=list)
     evaluation_criteria: List[str] = field(default_factory=list)
+    risk_domain: str = "GENERAL"
+    risk_level: str = "LOW"
 
 class LayerVerdict(str, Enum):
     PASS = "PASS"
@@ -48,6 +50,7 @@ class EvaluationFailure:
     observed_behavior: str
     expected_behavior: str
     severity: str
+    is_critical: bool = False
 
 @dataclass
 class EvaluationResult:
@@ -59,6 +62,13 @@ class EvaluationResult:
     # Session-level holistic fields
     trajectory: Optional[str] = None
     evidence_timeline: List[str] = field(default_factory=list)
+    
+    # New Phase 10 Scoring Fields
+    critical_failure: bool = False
+    critical_failure_count: int = 0
+    severity_counts: Dict[str, int] = field(default_factory=dict)
+    score_breakdown: Dict[str, Any] = field(default_factory=dict)
+    
     # Human Override Fields
     human_verdict: Optional[str] = None  # PASS, FAIL, PARTIAL, INVALID TEST
     human_reason: Optional[str] = None
@@ -79,6 +89,10 @@ class ExecutionMetadata:
     judge_provider: str = "unknown"
     judge_model: str = "unknown"
     judge_prompt_hash: str = "unknown"
+    
+    # Phase 10 Metadata
+    scoring_policy_version: str = "1.0.0"
+    critical_policy_version: str = "1.0.0"
 
 @dataclass
 class TestResult:
