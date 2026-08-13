@@ -6,6 +6,7 @@ from core.schema import TestSpec
 from core.evaluator import Evaluator
 from core.test_runner import TestRunner
 from models.mock import MockAIModel
+from database.sqlite import save_test_result
 
 def load_test_spec(filepath: str) -> TestSpec:
     with open(filepath, 'r') as f:
@@ -36,6 +37,10 @@ def main():
     runner = TestRunner(ai_model=ai_model, evaluator=evaluator)
     
     result = runner.run_test(spec)
+    
+    # Phase 1: Persist the result
+    save_test_result(result)
+    
     runner.print_report(result)
 
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
 import json
+import time
+import uuid
 from .schema import TestSpec, TestResult
 from .evaluator import Evaluator
 from models.base import BaseAIModel
@@ -21,25 +23,32 @@ class TestRunner:
         
         # 3. Create Result
         result = TestResult(
+            run_id=str(uuid.uuid4()),
             test_id=spec.test_id,
             ai_response=ai_response,
-            evaluation=evaluation
+            evaluation=evaluation,
+            timestamp=time.time()
         )
         
         return result
 
     def print_report(self, result: TestResult):
         print("\n" + "="*50)
-        print(f"TEST REPORT: {result.test_id}")
+        print(f"TEST REPORT: {result.test_id} (Run ID: {result.run_id})")
         print("="*50)
-        print(f"Passed: {result.evaluation.passed}")
-        print(f"Score:  {result.evaluation.score}")
+        print(f"Automatic Verdict: {'PASS' if result.evaluation.passed else 'FAIL'}")
+        print(f"Score:             {result.evaluation.score}")
+        
+        if result.evaluation.human_verdict:
+            print(f"Human Verdict:     {result.evaluation.human_verdict}")
+            print(f"Human Reason:      {result.evaluation.human_reason}")
+
         print("\nAI Response:")
         print(f'"{result.ai_response}"')
-        print("\nEvaluation:")
+        print("\nEvaluation Evidence:")
         print(f"Reasoning: {result.evaluation.reasoning}")
         
-        if not result.evaluation.passed:
+        if not result.evaluation.passed and result.evaluation.failures:
             print("\nFailures Detected:")
             for f in result.evaluation.failures:
                 print(f"  - Category: {f.category}")
