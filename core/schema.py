@@ -31,6 +31,7 @@ class LayerEvaluation:
     reasoning: str = ""
     confidence: Optional[float] = None
     criteria_results: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class EvaluationFailure:
@@ -63,6 +64,10 @@ class ExecutionMetadata:
     system_prompt_hash: str = "unknown"
     configuration_hash: str = "unknown"
     evaluation_engine_version: str = "0.1"
+    # Judge Metadata
+    judge_provider: str = "unknown"
+    judge_model: str = "unknown"
+    judge_prompt_hash: str = "unknown"
 
 @dataclass
 class TestResult:

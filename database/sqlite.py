@@ -156,7 +156,8 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
                 failures=layer_failures,
                 reasoning=ld.get("reasoning", ""),
                 confidence=ld.get("confidence", None),
-                criteria_results=ld.get("criteria_results", {})
+                criteria_results=ld.get("criteria_results", {}),
+                metadata=ld.get("metadata", {})
             ))
         
         evaluation = EvaluationResult(

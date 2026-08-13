@@ -48,6 +48,17 @@ class TestRunner:
         # 3. Build Metadata
         git_commit, git_dirty = get_git_info()
         
+        judge_provider = "unknown"
+        judge_model = "unknown"
+        judge_prompt_hash = "unknown"
+        
+        for layer in evaluation.layer_evaluations:
+            if layer.layer_name == "llm_judge" and layer.metadata:
+                judge_provider = layer.metadata.get("judge_provider", "unknown")
+                judge_model = layer.metadata.get("judge_model", "unknown")
+                # We could hash the prompt here or track prompt version
+                judge_prompt_hash = hash_string(layer.metadata.get("prompt_template", "unknown"))
+        
         metadata = ExecutionMetadata(
             git_commit=git_commit,
             git_dirty=git_dirty,
@@ -55,7 +66,10 @@ class TestRunner:
             configuration_hash=hash_dict(self.provider.config.as_dict()),
             provider=provider_response.provider if provider_response else self.provider.config.provider_name,
             model=provider_response.model if provider_response else self.provider.config.model_name,
-            model_version=provider_response.model_version if provider_response else "unknown"
+            model_version=provider_response.model_version if provider_response else "unknown",
+            judge_provider=judge_provider,
+            judge_model=judge_model,
+            judge_prompt_hash=judge_prompt_hash
         )
         
         # 4. Create Result
@@ -84,6 +98,8 @@ class TestRunner:
         print(f"Provider:          {result.metadata.provider}")
         print(f"Model:             {result.metadata.model}")
         print(f"Model Version:     {result.metadata.model_version}")
+        print(f"Judge Provider:    {result.metadata.judge_provider}")
+        print(f"Judge Model:       {result.metadata.judge_model}")
         print(f"Prompt Hash:       {result.metadata.system_prompt_hash}")
         print(f"Config Hash:       {result.metadata.configuration_hash}")
         print(f"Evaluator Version: {result.metadata.evaluation_engine_version}")

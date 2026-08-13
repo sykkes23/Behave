@@ -1,6 +1,7 @@
 import json
 from .schema import TestSpec, EvaluationResult, EvaluationFailure, LayerEvaluation, LayerVerdict
 from .taxonomy import FailureTag, RootCause, Severity
+from .judge import LLMJudge
 
 class Evaluator:
     def __init__(self, llm_judge_provider=None):
@@ -73,51 +74,15 @@ class Evaluator:
         llm_results = {}
         llm_verdict = LayerVerdict.UNCERTAIN # Default to uncertain if no LLM configured/used
         llm_reasoning = "No LLM judge configured."
+        llm_metadata = {}
 
-        if self.llm_judge_provider:
-            # Here we would send the spec and the AI response to the judge provider.
-            # We mock the structure parsing for the test requirement:
-            # "Structured judge responses are parsed correctly. Malformed do not crash."
-            
-            prompt = json.dumps({"scenario": spec.scenario, "response": ai_response})
-            # Generate judge response
-            try:
-                judge_response = self.llm_judge_provider.generate_response(prompt)
-                parsed = json.loads(judge_response.content)
-                
-                # Parse structured output
-                parsed_verdict = parsed.get("verdict", "UNCERTAIN")
-                if parsed_verdict == "PASS":
-                    llm_verdict = LayerVerdict.PASS
-                elif parsed_verdict == "FAIL":
-                    llm_verdict = LayerVerdict.FAIL
-                else:
-                    llm_verdict = LayerVerdict.UNCERTAIN
-                    
-                llm_reasoning = parsed.get("reasoning", "LLM Judge completed.")
-                
-                # Parse failures
-                for fail_data in parsed.get("failures", []):
-                    llm_failures.append(EvaluationFailure(
-                        tags=fail_data.get("tags", []),
-                        root_cause=fail_data.get("root_cause", "unknown"),
-                        observed_behavior=fail_data.get("observed_behavior", ""),
-                        expected_behavior=fail_data.get("expected_behavior", ""),
-                        severity=fail_data.get("severity", "medium")
-                    ))
-                    
-                # Parse criteria results
-                for crit in parsed.get("criteria_results", []):
-                    llm_results[crit.get("criterion_id")] = {
-                        "verdict": crit.get("verdict"),
-                        "confidence": crit.get("confidence"),
-                        "evidence": crit.get("evidence")
-                    }
-                    
-            except Exception as e:
-                llm_verdict = LayerVerdict.ERROR
-                llm_reasoning = f"LLM Judge failed or returned malformed output: {str(e)}"
-                
+        if isinstance(self.llm_judge_provider, LLMJudge):
+            layer_verdict, reasoning, failures, criteria_results, metadata_info = self.llm_judge_provider.evaluate(spec, ai_response)
+            llm_verdict = layer_verdict
+            llm_reasoning = reasoning
+            llm_failures = failures
+            llm_results = criteria_results
+            llm_metadata = metadata_info
         else:
             # MVP Simulated semantic layer (like before, but scoped to Layer 3)
             # This allows offline testing to simulate a "Judge"
@@ -144,7 +109,8 @@ class Evaluator:
             verdict=llm_verdict,
             failures=llm_failures,
             reasoning=llm_reasoning,
-            criteria_results=llm_results
+            criteria_results=llm_results,
+            metadata=llm_metadata
         ))
 
         # ---------------------------------------------------------

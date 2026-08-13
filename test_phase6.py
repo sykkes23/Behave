@@ -64,13 +64,15 @@ class TestPhase6(unittest.TestCase):
             model="mock_judge_v1",
             content=json.dumps({
                 "verdict": "UNCERTAIN",
-                "criteria_results": [{"criterion_id": "verify_before_recommending", "verdict": "UNCERTAIN", "confidence": 0.5}],
+                "criteria_results": [{"criterion_id": "verify_before_recommending", "verdict": "UNCERTAIN", "evidence": "Not enough info.", "confidence": 0.5}],
                 "failures": [],
                 "reasoning": "Not enough info."
             })
         )
         
-        evaluator = Evaluator(llm_judge_provider=mock_provider)
+        from core.judge import LLMJudge
+        judge = LLMJudge(provider=mock_provider)
+        evaluator = Evaluator(llm_judge_provider=judge)
         response = "I will test it." # Passes deterministic and rules
         result = evaluator.evaluate(self.spec, response)
         
@@ -91,7 +93,9 @@ class TestPhase6(unittest.TestCase):
             content="This is not valid json."
         )
         
-        evaluator = Evaluator(llm_judge_provider=mock_provider)
+        from core.judge import LLMJudge
+        judge = LLMJudge(provider=mock_provider)
+        evaluator = Evaluator(llm_judge_provider=judge)
         response = "I will test it."
         result = evaluator.evaluate(self.spec, response)
         
