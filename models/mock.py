@@ -1,5 +1,5 @@
 import time
-from typing import Dict
+from typing import Dict, Optional, List
 from .provider import BaseProvider, ProviderResponse, ProviderConfig
 
 class MockAIModel(BaseProvider):
@@ -7,7 +7,7 @@ class MockAIModel(BaseProvider):
         super().__init__(config)
         self.predefined_responses = predefined_responses or {}
 
-    def generate_response(self, prompt: str) -> ProviderResponse:
+    def generate_response(self, prompt: str, history: Optional[List[Dict[str, str]]] = None) -> ProviderResponse:
         start_time = time.time()
         
         response_text = "I am a mock response. I need more information to diagnose the issue."

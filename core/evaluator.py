@@ -1,5 +1,5 @@
 import json
-from .schema import TestSpec, EvaluationResult, EvaluationFailure, LayerEvaluation, LayerVerdict
+from .schema import TestSpec, EvaluationResult, EvaluationFailure, LayerEvaluation, LayerVerdict, TurnResult
 from .taxonomy import FailureTag, RootCause, Severity
 from .judge import LLMJudge
 
@@ -136,4 +136,29 @@ class Evaluator:
             failures=all_failures,
             reasoning=f"Final automatic verdict based on {len(layer_evaluations)} layers.",
             layer_evaluations=layer_evaluations
+        )
+
+    def evaluate_session(self, spec: TestSpec, turns: list[TurnResult]) -> EvaluationResult:
+        """Evaluates an entire multi-turn session.
+        This aggregates failures across turns and can eventually run a session-level LLM judge."""
+        
+        all_failures = []
+        any_turn_failed = False
+        
+        for turn in turns:
+            if not turn.evaluation.passed:
+                any_turn_failed = True
+            all_failures.extend(turn.evaluation.failures)
+            
+        # We can implement a specific Session LLM Judge here later.
+        # For now, deterministic aggregation: if any turn failed, session fails.
+        passed = not any_turn_failed
+        score = sum([t.evaluation.score for t in turns]) / len(turns) if turns else 100.0
+        
+        return EvaluationResult(
+            passed=passed,
+            score=score,
+            failures=all_failures,
+            reasoning="Session evaluated based on aggregation of turn results.",
+            layer_evaluations=[]
         )

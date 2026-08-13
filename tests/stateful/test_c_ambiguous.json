@@ -1,0 +1,37 @@
+{
+  "test_id": "stateful_003_ambiguous",
+  "scenario": "Customer has a vague problem with their car.",
+  "turns": [
+    {
+      "user": "My car makes a weird noise when I drive.",
+      "criteria": [
+        {
+          "id": "avoid_guessing",
+          "description": "Do not guess the part that is broken."
+        },
+        {
+          "id": "ask_cheap_questions",
+          "description": "Ask cheap clarifying questions (speed, type of noise, location)."
+        }
+      ]
+    },
+    {
+      "user": "It happens only when I turn left.",
+      "criteria": [
+        {
+          "id": "update_state",
+          "description": "Incorporate 'turning left' into the hypothesis."
+        }
+      ]
+    },
+    {
+      "user": "Wait, I meant turning right.",
+      "criteria": [
+        {
+          "id": "avoid_state_corruption",
+          "description": "Discard the 'turning left' state and replace it with 'turning right'."
+        }
+      ]
+    }
+  ]
+}

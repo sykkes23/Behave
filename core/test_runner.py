@@ -1,7 +1,7 @@
 import json
 import time
 import uuid
-from .schema import TestSpec, TestResult, ExecutionMetadata, EvaluationResult, EvaluationFailure
+from .schema import TestSpec, TestResult, ExecutionMetadata, EvaluationResult, EvaluationFailure, SessionResult, TurnResult, TurnSpec
 from .metadata import get_git_info, hash_string, hash_dict
 from .evaluator import Evaluator
 from models.provider import BaseProvider, ProviderError
@@ -135,3 +135,132 @@ class TestRunner:
                 print(f"    Expected: {f.expected_behavior}")
                 print(f"    Observed: {f.observed_behavior}\n")
         print("="*50 + "\n")
+
+    def run_session(self, spec: TestSpec) -> SessionResult:
+        print(f"Running Stateful Session: {spec.test_id}...")
+        
+        session_id = str(uuid.uuid4())
+        turns = []
+        history = []
+        
+        # Initial scenario prompt goes as first message for context, but usually multi-turn tests
+        # might just use turns directly. Let's send the scenario as a system/user context first.
+        # For simplicity, we just use the scenario as the first turn or just let history accumulate.
+        if spec.scenario:
+            history.append({"role": "user", "content": spec.scenario})
+            # Generate an initial response to establish context? Or just treat turns as user inputs.
+            # Usually, if there are turns, the first turn is the first message. If scenario is provided, we can prepend it.
+            
+        turn_number = 1
+        for turn_spec in spec.turns:
+            print(f" -> Turn {turn_number}: User Input...")
+            user_input = turn_spec.user_input
+            
+            # 1. Send input with history
+            try:
+                # Some providers like venice and gemini support history. Mock does too now.
+                provider_response = self.provider.generate_response(user_input, history=history)
+                ai_response_text = provider_response.content
+                
+                # Update history
+                history.append({"role": "user", "content": user_input})
+                history.append({"role": "model", "content": ai_response_text})
+                
+                # 2. Evaluate turn
+                print(" -> Evaluating turn...")
+                # We create a temporary TestSpec to evaluate this specific turn's criteria
+                temp_spec = TestSpec(
+                    test_id=spec.test_id,
+                    scenario=spec.scenario,
+                    criteria=turn_spec.criteria,
+                    required_behaviors=[],
+                    forbidden_behaviors=[],
+                    evaluation_criteria=[]
+                )
+                evaluation = self.evaluator.evaluate(temp_spec, ai_response_text)
+                
+            except ProviderError as e:
+                print(f" -> Provider Error: {e.error_type.value}")
+                ai_response_text = f"[{e.error_type.value}] {e.message}"
+                provider_response = None
+                evaluation = EvaluationResult(
+                    passed=False,
+                    score=0.0,
+                    failures=[EvaluationFailure(
+                        tags=[e.error_type.value],
+                        root_cause=RootCause.UNKNOWN.value,
+                        observed_behavior=e.message,
+                        expected_behavior="Valid API response",
+                        severity=Severity.CRITICAL.value
+                    )],
+                    reasoning="Test aborted due to provider error."
+                )
+            
+            turns.append(TurnResult(
+                turn_id=str(uuid.uuid4()),
+                turn_number=turn_number,
+                user_input=user_input,
+                ai_response=ai_response_text,
+                evaluation=evaluation,
+                timestamp=time.time()
+            ))
+            turn_number += 1
+            
+        # Session Evaluation
+        final_evaluation = self.evaluator.evaluate_session(spec, turns)
+        
+        # Build Metadata
+        git_commit, git_dirty = get_git_info()
+        judge_provider, judge_model, judge_prompt_hash = "unknown", "unknown", "unknown"
+        
+        # Look for judge metadata from any turn
+        for t in turns:
+            for layer in t.evaluation.layer_evaluations:
+                if layer.layer_name == "llm_judge" and layer.metadata:
+                    judge_provider = layer.metadata.get("judge_provider", "unknown")
+                    judge_model = layer.metadata.get("judge_model", "unknown")
+                    judge_prompt_hash = hash_string(layer.metadata.get("prompt_template", "unknown"))
+                    break
+                    
+        metadata = ExecutionMetadata(
+            git_commit=git_commit,
+            git_dirty=git_dirty,
+            system_prompt_hash=hash_string(spec.scenario),
+            configuration_hash=hash_dict(self.provider.config.as_dict()),
+            provider=self.provider.config.provider_name,
+            model=self.provider.config.model_name,
+            model_version="unknown",
+            judge_provider=judge_provider,
+            judge_model=judge_model,
+            judge_prompt_hash=judge_prompt_hash
+        )
+        
+        return SessionResult(
+            session_id=session_id,
+            test_id=spec.test_id,
+            test_version=spec.test_version,
+            turns=turns,
+            final_evaluation=final_evaluation,
+            metadata=metadata,
+            timestamp=time.time()
+        )
+
+    def print_session_report(self, session: SessionResult):
+        print("\n" + "="*60)
+        print(f"STATEFUL SESSION REPORT: {session.test_id} (Session ID: {session.session_id})")
+        print("="*60)
+        
+        for turn in session.turns:
+            print(f"\n--- Turn {turn.turn_number} ---")
+            print(f"User: {turn.user_input}")
+            print(f"AI:   {turn.ai_response}")
+            print(f"Turn Verdict: {'PASS' if turn.evaluation.passed else 'FAIL'}")
+            if turn.evaluation.failures:
+                for f in turn.evaluation.failures:
+                    print(f"  -> Failure [{f.severity}]: {', '.join(f.tags)}")
+                    print(f"     Observed: {f.observed_behavior}")
+                    
+        print("\n" + "-"*60)
+        print(f"Final Session Verdict: {'PASS' if session.final_evaluation.passed else 'FAIL'}")
+        print(f"Session Score:         {session.final_evaluation.score}")
+        print("="*60 + "\n")

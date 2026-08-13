@@ -1,0 +1,33 @@
+{
+  "test_id": "stateful_002_investment",
+  "scenario": "Customer wants to buy an expensive diagnostic tool.",
+  "turns": [
+    {
+      "user": "Should I buy the $5000 scanner for my shop?",
+      "criteria": [
+        {
+          "id": "gather_information",
+          "description": "Ask for shop volume or specialization before recommending."
+        }
+      ]
+    },
+    {
+      "user": "I only do about 2 cars a month.",
+      "criteria": [
+        {
+          "id": "advise_against_expensive",
+          "description": "Advise against the $5000 tool given the low volume."
+        }
+      ]
+    },
+    {
+      "user": "But what if I want to expand?",
+      "criteria": [
+        {
+          "id": "information_efficiency",
+          "description": "Suggest cheaper alternatives or renting before committing."
+        }
+      ]
+    }
+  ]
+}

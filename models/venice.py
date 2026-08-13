@@ -13,15 +13,22 @@ class VeniceProvider(BaseProvider):
         # Default model if not specified
         self.model = config.model_name if config.model_name and config.model_name != "unknown" else "venice-default"
         
-    def generate_response(self, prompt: str) -> ProviderResponse:
+    def generate_response(self, prompt: str, history: list = None) -> ProviderResponse:
         if not self.api_key:
             raise ProviderError(ProviderErrorType.AUTH_ERROR, "Venice API key is missing.")
             
         url = "https://api.venice.ai/api/v1/chat/completions"
         
+        messages = []
+        if history:
+            for msg in history:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+        
+        messages.append({"role": "user", "content": prompt})
+        
         payload = {
             "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "temperature": self.config.temperature
         }
         if self.config.top_p is not None:

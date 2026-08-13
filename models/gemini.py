@@ -13,14 +13,22 @@ class GeminiProvider(BaseProvider):
         # Default model if not specified
         self.model = config.model_name if config.model_name and config.model_name != "unknown" else "gemini-1.5-flash"
         
-    def generate_response(self, prompt: str) -> ProviderResponse:
+    def generate_response(self, prompt: str, history: list = None) -> ProviderResponse:
         if not self.api_key:
             raise ProviderError(ProviderErrorType.AUTH_ERROR, "Gemini API key is missing.")
             
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
         
+        contents = []
+        if history:
+            for msg in history:
+                role = "user" if msg["role"] == "user" else "model"
+                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+        
+        contents.append({"role": "user", "parts": [{"text": prompt}]})
+        
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
+            "contents": contents,
             "generationConfig": {
                 "temperature": self.config.temperature,
             }

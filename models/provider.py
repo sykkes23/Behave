@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from enum import Enum
 import time
 
@@ -58,6 +58,6 @@ class BaseProvider(ABC):
         self.config = config
 
     @abstractmethod
-    def generate_response(self, prompt: str) -> ProviderResponse:
-        """Generates a normalized response from the provider."""
+    def generate_response(self, prompt: str, history: Optional[List[Dict[str, str]]] = None) -> ProviderResponse:
+        """Generates a normalized response from the provider, optionally using history for multi-turn."""
         pass

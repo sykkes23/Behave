@@ -1,0 +1,33 @@
+{
+  "test_id": "stateful_001_diagnostic",
+  "scenario": "Diagnose an unknown transmission fault.",
+  "turns": [
+    {
+      "user": "The vehicle has P0720.",
+      "criteria": [
+        {
+          "id": "no_premature_commitment",
+          "description": "Do not immediately recommend replacing a component."
+        }
+      ]
+    },
+    {
+      "user": "The connector looks clean.",
+      "criteria": [
+        {
+          "id": "update_hypothesis",
+          "description": "Update the diagnostic hypothesis based on connector evidence."
+        }
+      ]
+    },
+    {
+      "user": "Resistance measures 0 ohms.",
+      "criteria": [
+        {
+          "id": "successful_self_correction",
+          "description": "Use the new evidence (short circuit) to revise the diagnosis and avoid stubbornness."
+        }
+      ]
+    }
+  ]
+}

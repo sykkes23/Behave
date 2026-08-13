@@ -8,10 +8,18 @@ class EvaluationCriterion:
     description: str
 
 @dataclass
+class TurnSpec:
+    user_input: str
+    criteria: List[EvaluationCriterion] = field(default_factory=list)
+    expected_behavior: str = ""
+
+@dataclass
 class TestSpec:
     test_id: str
     scenario: str
     test_version: str = "unknown"
+    turns: List[TurnSpec] = field(default_factory=list)
+    # Legacy fields for backward compatibility with older single-turn tests
     criteria: List[EvaluationCriterion] = field(default_factory=list)
     required_behaviors: List[str] = field(default_factory=list)
     forbidden_behaviors: List[str] = field(default_factory=list)
@@ -71,10 +79,29 @@ class ExecutionMetadata:
 
 @dataclass
 class TestResult:
-    run_id: str  # Unique ID for this execution
+    run_id: str  # Unique ID for this execution (turn or session if single-turn)
     test_id: str
     test_version: str
     ai_response: str
     evaluation: EvaluationResult
+    metadata: ExecutionMetadata
+    timestamp: float
+    
+@dataclass
+class TurnResult:
+    turn_id: str
+    turn_number: int
+    user_input: str
+    ai_response: str
+    evaluation: EvaluationResult
+    timestamp: float
+
+@dataclass
+class SessionResult:
+    session_id: str
+    test_id: str
+    test_version: str
+    turns: List[TurnResult]
+    final_evaluation: EvaluationResult
     metadata: ExecutionMetadata
     timestamp: float

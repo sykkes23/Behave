@@ -7,12 +7,28 @@ from core.evaluator import Evaluator
 from core.test_runner import TestRunner
 from models.provider import ProviderConfig
 from models.factory import get_provider
-from database.sqlite import save_test_result
+from database.sqlite import save_test_result, save_session_result
 import json
+
+from core.schema import TestSpec, TurnSpec, EvaluationCriterion
 
 def load_test_spec(filepath: str) -> TestSpec:
     with open(filepath, 'r') as f:
         data = json.load(f)
+        
+    turns = []
+    for t in data.get("turns", []):
+        criteria = [EvaluationCriterion(**c) for c in t.get("criteria", [])]
+        turns.append(TurnSpec(
+            user_input=t.get("user"),
+            criteria=criteria,
+            expected_behavior=t.get("expected_behavior", "")
+        ))
+    data["turns"] = turns
+    
+    if "criteria" in data:
+        data["criteria"] = [EvaluationCriterion(**c) for c in data["criteria"]]
+        
     return TestSpec(**data)
 
 def main():
@@ -63,9 +79,14 @@ def main():
             provider = get_provider(config, mock_responses=mock_responses)
             runner = TestRunner(provider=provider, evaluator=evaluator)
             
-            result = runner.run_test(spec)
-            save_test_result(result)
-            runner.print_report(result)
+            if spec.turns:
+                result = runner.run_session(spec)
+                save_session_result(result)
+                runner.print_session_report(result)
+            else:
+                result = runner.run_test(spec)
+                save_test_result(result)
+                runner.print_report(result)
             
         except Exception as e:
             print(f"FATAL ERROR while testing provider {provider_name}: {str(e)}")

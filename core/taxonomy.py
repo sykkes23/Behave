@@ -13,6 +13,15 @@ class FailureTag(str, Enum):
     UNNECESSARY_COMPLEXITY = "unnecessary_complexity"
     IRRELEVANT_RESPONSE = "irrelevant_response"
     INSTRUCTION_FAILURE = "instruction_failure"
+    AUTH_ERROR = "AUTH_ERROR"
+    TIMEOUT = "TIMEOUT"
+    
+    # Phase 8 Stateful additions
+    STUBBORNNESS = "stubbornness"
+    PREMATURE_COMMITMENT = "premature_commitment"
+    INFORMATION_INEFFICIENCY = "information_inefficiency"
+    STATE_CORRUPTION = "state_corruption"
+    SUCCESSFUL_SELF_CORRECTION = "successful_self_correction" # Positive signal
 
 class RootCause(str, Enum):
     INSUFFICIENT_INFORMATION = "insufficient_information"

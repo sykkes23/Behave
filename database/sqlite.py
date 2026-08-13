@@ -2,7 +2,7 @@ import sqlite3
 import json
 import dataclasses
 from typing import List, Optional, Any
-from core.schema import TestResult, EvaluationResult, EvaluationFailure, ExecutionMetadata, LayerEvaluation, LayerVerdict
+from core.schema import TestResult, EvaluationResult, EvaluationFailure, ExecutionMetadata, LayerEvaluation, LayerVerdict, SessionResult, TurnResult
 
 DB_PATH = "behave.db"
 
@@ -25,6 +25,34 @@ def init_db():
                 review_timestamp REAL,
                 metadata_json TEXT,
                 layer_evaluations_json TEXT
+            )
+        ''')
+        
+        # Phase 8 Stateful schemas
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS test_sessions (
+                session_id TEXT PRIMARY KEY,
+                test_id TEXT,
+                test_version TEXT,
+                final_evaluation_json TEXT,
+                metadata_json TEXT,
+                timestamp REAL
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS test_turns (
+                turn_id TEXT PRIMARY KEY,
+                session_id TEXT,
+                turn_number INTEGER,
+                user_input TEXT,
+                ai_response TEXT,
+                evaluation_json TEXT,
+                timestamp REAL,
+                human_verdict TEXT,
+                human_reason TEXT,
+                review_timestamp REAL,
+                FOREIGN KEY(session_id) REFERENCES test_sessions(session_id)
             )
         ''')
         conn.commit()
@@ -184,4 +212,146 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
             evaluation=evaluation,
             metadata=metadata,
             timestamp=timestamp
+        )
+
+def _serialize_evaluation(evaluation: EvaluationResult) -> str:
+    failures = [{
+        "tags": f.tags,
+        "root_cause": f.root_cause,
+        "observed_behavior": f.observed_behavior,
+        "expected_behavior": f.expected_behavior,
+        "severity": f.severity
+    } for f in evaluation.failures]
+    layer_evaluations = [dataclasses.asdict(l) for l in evaluation.layer_evaluations]
+    return json.dumps({
+        "passed": evaluation.passed,
+        "score": evaluation.score,
+        "failures": failures,
+        "reasoning": evaluation.reasoning,
+        "layer_evaluations": layer_evaluations,
+        "human_verdict": evaluation.human_verdict,
+        "human_reason": evaluation.human_reason,
+        "review_timestamp": evaluation.review_timestamp
+    })
+
+def _deserialize_evaluation(json_str: str) -> EvaluationResult:
+    if not json_str:
+        return EvaluationResult(passed=False, score=0.0)
+    data = json.loads(json_str)
+    
+    failures = []
+    for f in data.get("failures", []):
+        failures.append(EvaluationFailure(**f))
+        
+    layer_evals = []
+    for ld in data.get("layer_evaluations", []):
+        layer_failures = [EvaluationFailure(**f) for f in ld.get("failures", [])]
+        verdict_str = ld.get("verdict")
+        verdict = LayerVerdict(verdict_str) if verdict_str else LayerVerdict.UNCERTAIN
+        layer_evals.append(LayerEvaluation(
+            layer_name=ld.get("layer_name", "unknown"),
+            verdict=verdict,
+            failures=layer_failures,
+            reasoning=ld.get("reasoning", ""),
+            confidence=ld.get("confidence", None),
+            criteria_results=ld.get("criteria_results", {}),
+            metadata=ld.get("metadata", {})
+        ))
+        
+    return EvaluationResult(
+        passed=data.get("passed", False),
+        score=data.get("score", 0.0),
+        failures=failures,
+        reasoning=data.get("reasoning", ""),
+        layer_evaluations=layer_evals,
+        human_verdict=data.get("human_verdict"),
+        human_reason=data.get("human_reason"),
+        review_timestamp=data.get("review_timestamp")
+    )
+
+def save_session_result(session: SessionResult):
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO test_sessions (
+                session_id, test_id, test_version, final_evaluation_json, metadata_json, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            session.session_id,
+            session.test_id,
+            session.test_version,
+            _serialize_evaluation(session.final_evaluation),
+            json.dumps(dataclasses.asdict(session.metadata)),
+            session.timestamp
+        ))
+        
+        for turn in session.turns:
+            cursor.execute('''
+                INSERT INTO test_turns (
+                    turn_id, session_id, turn_number, user_input, ai_response,
+                    evaluation_json, timestamp, human_verdict, human_reason, review_timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                turn.turn_id,
+                session.session_id,
+                turn.turn_number,
+                turn.user_input,
+                turn.ai_response,
+                _serialize_evaluation(turn.evaluation),
+                turn.timestamp,
+                turn.evaluation.human_verdict,
+                turn.evaluation.human_reason,
+                turn.evaluation.review_timestamp
+            ))
+        conn.commit()
+
+def get_session_result(session_id: str) -> Optional[SessionResult]:
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM test_sessions WHERE session_id = ?', (session_id,))
+        s_row = cursor.fetchone()
+        if not s_row:
+            return None
+        
+        cursor.execute('PRAGMA table_info(test_sessions)')
+        s_cols = [info[1] for info in cursor.fetchall()]
+        s_dict = dict(zip(s_cols, s_row))
+        
+        cursor.execute('SELECT * FROM test_turns WHERE session_id = ? ORDER BY turn_number ASC', (session_id,))
+        t_rows = cursor.fetchall()
+        cursor.execute('PRAGMA table_info(test_turns)')
+        t_cols = [info[1] for info in cursor.fetchall()]
+        
+        turns = []
+        for t_row in t_rows:
+            t_dict = dict(zip(t_cols, t_row))
+            turn_eval = _deserialize_evaluation(t_dict.get("evaluation_json", "{}"))
+            # Hydrate human overrides directly onto the turn's evaluation
+            turn_eval.human_verdict = t_dict.get("human_verdict")
+            turn_eval.human_reason = t_dict.get("human_reason")
+            turn_eval.review_timestamp = t_dict.get("review_timestamp")
+            
+            turns.append(TurnResult(
+                turn_id=t_dict["turn_id"],
+                turn_number=t_dict["turn_number"],
+                user_input=t_dict.get("user_input", ""),
+                ai_response=t_dict.get("ai_response", ""),
+                evaluation=turn_eval,
+                timestamp=t_dict.get("timestamp", 0.0)
+            ))
+            
+        meta = ExecutionMetadata()
+        if s_dict.get("metadata_json"):
+            meta = ExecutionMetadata(**json.loads(s_dict["metadata_json"]))
+            
+        return SessionResult(
+            session_id=s_dict["session_id"],
+            test_id=s_dict.get("test_id", "unknown"),
+            test_version=s_dict.get("test_version", "unknown"),
+            turns=turns,
+            final_evaluation=_deserialize_evaluation(s_dict.get("final_evaluation_json", "{}")),
+            metadata=meta,
+            timestamp=s_dict.get("timestamp", 0.0)
         )
