@@ -5,6 +5,7 @@ from typing import List, Optional
 class TestSpec:
     test_id: str
     scenario: str
+    test_version: str = "unknown"
     required_behaviors: List[str] = field(default_factory=list)
     forbidden_behaviors: List[str] = field(default_factory=list)
     evaluation_criteria: List[str] = field(default_factory=list)
@@ -29,9 +30,23 @@ class EvaluationResult:
     review_timestamp: Optional[float] = None
 
 @dataclass
+class ExecutionMetadata:
+    system_version: str = "v0.1.0"
+    git_commit: str = "unknown"
+    git_dirty: bool = False
+    provider: str = "unknown"
+    model: str = "mock"
+    model_version: str = "unknown"
+    system_prompt_hash: str = "unknown"
+    configuration_hash: str = "unknown"
+    evaluation_engine_version: str = "0.1"
+
+@dataclass
 class TestResult:
     run_id: str  # Unique ID for this execution
     test_id: str
+    test_version: str
     ai_response: str
     evaluation: EvaluationResult
+    metadata: ExecutionMetadata
     timestamp: float
