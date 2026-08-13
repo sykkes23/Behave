@@ -93,6 +93,12 @@ class TestRunner:
         print(f"Automatic Verdict: {'PASS' if result.evaluation.passed else 'FAIL'}")
         print(f"Score:             {result.evaluation.score}")
         
+        # Display Layer Verdicts to show disagreement if any
+        if hasattr(result.evaluation, 'layer_evaluations') and result.evaluation.layer_evaluations:
+            print("\nLayer Verdicts:")
+            for layer in result.evaluation.layer_evaluations:
+                print(f"  - {layer.layer_name.capitalize():<15}: {layer.verdict.value}")
+        
         if result.evaluation.human_verdict:
             print(f"Human Verdict:     {result.evaluation.human_verdict}")
             print(f"Human Reason:      {result.evaluation.human_reason}")

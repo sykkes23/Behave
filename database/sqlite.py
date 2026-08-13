@@ -1,8 +1,8 @@
 import sqlite3
 import json
 import dataclasses
-from typing import List, Optional
-from core.schema import TestResult, EvaluationResult, EvaluationFailure, ExecutionMetadata
+from typing import List, Optional, Any
+from core.schema import TestResult, EvaluationResult, EvaluationFailure, ExecutionMetadata, LayerEvaluation, LayerVerdict
 
 DB_PATH = "behave.db"
 
@@ -23,7 +23,8 @@ def init_db():
                 human_verdict TEXT,
                 human_reason TEXT,
                 review_timestamp REAL,
-                metadata_json TEXT
+                metadata_json TEXT,
+                layer_evaluations_json TEXT
             )
         ''')
         conn.commit()
@@ -39,15 +40,13 @@ def save_test_result(result: TestResult):
         "severity": f.severity
     } for f in result.evaluation.failures])
     
-    
     metadata_json = json.dumps(dataclasses.asdict(result.metadata))
+    layer_evaluations_json = json.dumps([dataclasses.asdict(l) for l in result.evaluation.layer_evaluations])
     
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         
         # We might be dealing with an old database schema that doesn't have the new columns.
-        # Since SQLite ALTER TABLE is somewhat limited, we handle adding columns if they are missing
-        # (For MVP purposes, adding columns explicitly)
         try:
             cursor.execute('ALTER TABLE test_runs ADD COLUMN test_version TEXT')
         except sqlite3.OperationalError:
@@ -56,13 +55,17 @@ def save_test_result(result: TestResult):
             cursor.execute('ALTER TABLE test_runs ADD COLUMN metadata_json TEXT')
         except sqlite3.OperationalError:
             pass
+        try:
+            cursor.execute('ALTER TABLE test_runs ADD COLUMN layer_evaluations_json TEXT')
+        except sqlite3.OperationalError:
+            pass
 
         cursor.execute('''
             INSERT INTO test_runs (
                 run_id, test_id, test_version, ai_response, auto_passed, score,
                 failures_json, reasoning, timestamp,
-                human_verdict, human_reason, review_timestamp, metadata_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                human_verdict, human_reason, review_timestamp, metadata_json, layer_evaluations_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             result.run_id,
             result.test_id,
@@ -76,7 +79,8 @@ def save_test_result(result: TestResult):
             result.evaluation.human_verdict,
             result.evaluation.human_reason,
             result.evaluation.review_timestamp,
-            metadata_json
+            metadata_json,
+            layer_evaluations_json
         ))
         conn.commit()
 
@@ -120,6 +124,7 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
         human_reason = row_dict.get("human_reason", None)
         review_timestamp = row_dict.get("review_timestamp", None)
         metadata_json = row_dict.get("metadata_json", None)
+        layer_evaluations_json = row_dict.get("layer_evaluations_json") or "[]"
         
         failures_data = json.loads(failures_json)
         failures = []
@@ -129,12 +134,37 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
                 f["tags"] = [f.pop("category")]
                 f["root_cause"] = "unknown"
             failures.append(EvaluationFailure(**f))
+            
+        layers_data = json.loads(layer_evaluations_json)
+        layer_evals = []
+        for ld in layers_data:
+            layer_failures = []
+            for f in ld.get("failures", []):
+                # Backward compatibility with Phase 1
+                if "category" in f:
+                    f["tags"] = [f.pop("category")]
+                    f["root_cause"] = "unknown"
+                layer_failures.append(EvaluationFailure(**f))
+            
+            # Map back enum
+            verdict_str = ld.get("verdict")
+            verdict = LayerVerdict(verdict_str) if verdict_str else LayerVerdict.UNCERTAIN
+            
+            layer_evals.append(LayerEvaluation(
+                layer_name=ld.get("layer_name", "unknown"),
+                verdict=verdict,
+                failures=layer_failures,
+                reasoning=ld.get("reasoning", ""),
+                confidence=ld.get("confidence", None),
+                criteria_results=ld.get("criteria_results", {})
+            ))
         
         evaluation = EvaluationResult(
             passed=bool(auto_passed),
             score=score,
             failures=failures,
             reasoning=reasoning,
+            layer_evaluations=layer_evals,
             human_verdict=human_verdict,
             human_reason=human_reason,
             review_timestamp=review_timestamp
