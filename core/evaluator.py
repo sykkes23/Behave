@@ -4,6 +4,7 @@ from .taxonomy import FailureTag, RootCause, Severity, BehavioralTrajectory
 from .judge import LLMJudge
 from .critical_policy import CriticalPolicyEngine
 from .scoring import ScoringEngine
+from .rules import evaluate_criterion, forbidden_behavior_matches, response_level_failures
 
 class Evaluator:
     def __init__(self, llm_judge_provider=None):
@@ -13,15 +14,15 @@ class Evaluator:
 
     def evaluate(self, spec: TestSpec, ai_response: str) -> EvaluationResult:
         layer_evaluations = []
-        
-        # ---------------------------------------------------------
-        # Layer 1: Deterministic evaluation
-        # ---------------------------------------------------------
+
+
+
+
         det_failures = []
         response_lower = ai_response.lower()
-        
+
         for forbidden in spec.forbidden_behaviors:
-            if forbidden.lower() in response_lower:
+            if forbidden_behavior_matches(ai_response, forbidden):
                 det_failures.append(EvaluationFailure(
                     tags=[FailureTag.INSTRUCTION_FAILURE.value],
                     root_cause=RootCause.EVALUATION_ERROR.value,
@@ -29,7 +30,7 @@ class Evaluator:
                     expected_behavior=f"Avoid: {forbidden}",
                     severity=Severity.HIGH.value
                 ))
-                
+
         det_verdict = LayerVerdict.FAIL if det_failures else LayerVerdict.PASS
         layer_evaluations.append(LayerEvaluation(
             layer_name="deterministic",
@@ -38,45 +39,59 @@ class Evaluator:
             reasoning=f"Found {len(det_failures)} deterministic violations." if det_failures else "Passed deterministic checks."
         ))
 
-        # ---------------------------------------------------------
-        # Layer 2: Rule / Evidence evaluation (Simulated)
-        # ---------------------------------------------------------
-        # For MVP, we simulate rule evaluation based on criteria.
+
+
+
+
         rule_failures = []
         rule_results = {}
         rule_verdict = LayerVerdict.PASS
-        
+
         if spec.criteria:
             for criterion in spec.criteria:
-                # Simulated basic string matching for rules to show separation of concerns
-                # In real life, Layer 2 might run specific Python regex/parsing functions.
-                if criterion.id == "verify_before_recommending" and "replace" in response_lower and "multimeter" not in response_lower:
-                    rule_failures.append(EvaluationFailure(
-                        tags=[FailureTag.PREMATURE_CONCLUSION.value],
-                        root_cause=RootCause.REASONING_ERROR.value,
-                        observed_behavior="Recommended replacement without diagnostic test.",
-                        expected_behavior=criterion.description,
-                        severity=Severity.MEDIUM.value
-                    ))
-                    rule_results[criterion.id] = {"verdict": "FAIL", "evidence": "Missing multimeter test."}
-                    rule_verdict = LayerVerdict.FAIL
-                else:
-                    rule_results[criterion.id] = {"verdict": "PASS"}
+                outcome = evaluate_criterion(criterion, ai_response, spec.scenario)
+                rule_results[criterion.id] = {
+                    "verdict": outcome.verdict.value,
+                    "evidence": outcome.evidence,
+                }
+                if outcome.failure:
+                    rule_failures.append(outcome.failure)
+
+            if any(
+                result["verdict"] == LayerVerdict.FAIL.value
+                for result in rule_results.values()
+            ):
+                rule_verdict = LayerVerdict.FAIL
+            elif any(
+                result["verdict"] == LayerVerdict.UNCERTAIN.value
+                for result in rule_results.values()
+            ):
+                rule_verdict = LayerVerdict.UNCERTAIN
+
+        rule_failures.extend(response_level_failures(spec, ai_response))
+        if rule_failures:
+            rule_verdict = LayerVerdict.FAIL
 
         layer_evaluations.append(LayerEvaluation(
             layer_name="rules",
             verdict=rule_verdict,
             failures=rule_failures,
-            reasoning=f"Failed {len(rule_failures)} rule criteria." if rule_failures else "Passed all rules.",
+            reasoning=(
+                f"Failed {len(rule_failures)} rule checks."
+                if rule_failures
+                else "One or more criteria lack deterministic coverage."
+                if rule_verdict == LayerVerdict.UNCERTAIN
+                else "Passed all implemented rules."
+            ),
             criteria_results=rule_results
         ))
 
-        # ---------------------------------------------------------
-        # Layer 3: LLM Judge evaluation
-        # ---------------------------------------------------------
+
+
+
         llm_failures = []
         llm_results = {}
-        llm_verdict = LayerVerdict.UNCERTAIN # Default to uncertain if no LLM configured/used
+        llm_verdict = LayerVerdict.UNCERTAIN
         llm_reasoning = "No LLM judge configured."
         llm_metadata = {}
 
@@ -88,8 +103,8 @@ class Evaluator:
             llm_results = criteria_results
             llm_metadata = metadata_info
         else:
-            # MVP Simulated semantic layer (like before, but scoped to Layer 3)
-            # This allows offline testing to simulate a "Judge"
+
+
             if "p0720" in spec.scenario.lower() or "oss" in spec.scenario.lower():
                 if "replace the sensor" in response_lower or "replace sensor" in response_lower:
                     if "test circuit" not in response_lower and "multimeter" not in response_lower:
@@ -103,7 +118,7 @@ class Evaluator:
                         llm_verdict = LayerVerdict.FAIL
                         llm_reasoning = "Semantic analysis detected premature conclusion."
 
-        # If it wasn't mocked to PASS or ERROR, and failures were added, make sure verdict aligns
+
         if not self.llm_judge_provider and len(llm_failures) == 0:
             llm_verdict = LayerVerdict.PASS
             llm_reasoning = "Passed semantic checks."
@@ -117,13 +132,13 @@ class Evaluator:
             metadata=llm_metadata
         ))
 
-        # ---------------------------------------------------------
-        # Final aggregation
-        # ---------------------------------------------------------
-        # The system needs to know *why* the final automatic verdict happened.
-        # If any layer failed (and isn't just UNCERTAIN), the final result is FAIL.
-        # UNCERTAIN doesn't automatically fail the test. ERROR fails the test.
-        
+
+
+
+
+
+
+
         all_failures = []
         provider_errors = 0
         for layer in layer_evaluations:
@@ -131,15 +146,40 @@ class Evaluator:
             if layer.verdict == LayerVerdict.ERROR:
                 provider_errors += 1
 
-        # 1. Apply Critical Policy
+        unresolved_criteria = []
+        for criterion in spec.criteria:
+            rule_result = rule_results.get(criterion.id, {})
+            llm_result = llm_results.get(criterion.id, {})
+            rule_resolved = rule_result.get("verdict") in {"PASS", "FAIL"}
+            llm_resolved = llm_result.get("verdict") in {"PASS", "FAIL"}
+            if not rule_resolved and not llm_resolved:
+                unresolved_criteria.append(criterion.id)
+
+
         all_failures = self.critical_policy.evaluate(spec, all_failures)
-        
-        # 2. Score
+
+
         final_passed, score, breakdown, sev_counts = self.scoring_engine.score(spec, all_failures, provider_errors)
-        
+
+        if unresolved_criteria:
+            final_passed = False
+            score = 0.0
+            breakdown["measurement_incomplete"] = True
+            breakdown["unresolved_criteria"] = unresolved_criteria
+            breakdown["final_verdict_reason"] = (
+                "NOT EVALUATED: no conclusive evaluator covered criteria: "
+                + ", ".join(unresolved_criteria)
+            )
+            reliability_status = "INSUFFICIENT_DATA"
+            reliability_reason = breakdown["final_verdict_reason"]
+        else:
+            breakdown["measurement_incomplete"] = False
+            reliability_status = "RELIABLE"
+            reliability_reason = "All explicit criteria received a conclusive evaluation."
+
         critical_failure = breakdown.get("critical_override", False)
         critical_count = sev_counts.get(Severity.CRITICAL.value, 0)
-        
+
         return EvaluationResult(
             passed=final_passed,
             score=score,
@@ -149,40 +189,78 @@ class Evaluator:
             critical_failure=critical_failure,
             critical_failure_count=critical_count,
             severity_counts=sev_counts,
-            score_breakdown=breakdown
+            score_breakdown=breakdown,
+            reliability_status=reliability_status,
+            reliability_reason=reliability_reason,
         )
 
     def evaluate_session(self, spec: TestSpec, turns: list[TurnResult]) -> EvaluationResult:
-        """Evaluates an entire multi-turn session.
-        This aggregates failures across turns and can eventually run a session-level LLM judge."""
-        
+
+
         all_failures = []
         provider_errors = 0
+        provider_error_turns = []
         for turn in turns:
             all_failures.extend(turn.evaluation.failures)
-            if turn.evaluation.score_breakdown.get("provider_errors_ignored", 0) > 0:
+            if turn.provider_status != "SUCCESS":
                 provider_errors += 1
-            
-        # Re-evaluate critical policy across all failures
+                provider_error_turns.append(turn.turn_number)
+
+        incomplete_turns = [
+            turn.turn_number
+            for turn in turns
+            if turn.evaluation.score_breakdown.get("measurement_incomplete", False)
+        ]
+
+
         all_failures = self.critical_policy.evaluate(spec, all_failures)
-        
-        # Score session
+
+
         final_passed, score, breakdown, sev_counts = self.scoring_engine.score(spec, all_failures, provider_errors)
+        if provider_error_turns:
+            final_passed = False
+            score = 0.0
+            breakdown["execution_incomplete"] = True
+            breakdown["measurement_incomplete"] = False
+            breakdown["provider_error_turns"] = provider_error_turns
+            breakdown["final_verdict_reason"] = (
+                "NOT EVALUATED: provider execution failed on turns "
+                + ", ".join(str(turn) for turn in provider_error_turns)
+            )
+            reliability_status = "UNRELIABLE"
+            reliability_reason = breakdown["final_verdict_reason"]
+        elif incomplete_turns:
+            final_passed = False
+            score = 0.0
+            breakdown["measurement_incomplete"] = True
+            breakdown["incomplete_turns"] = incomplete_turns
+            breakdown["final_verdict_reason"] = (
+                "NOT EVALUATED: incomplete criterion coverage on turns "
+                + ", ".join(str(turn) for turn in incomplete_turns)
+            )
+            reliability_status = "INSUFFICIENT_DATA"
+            reliability_reason = breakdown["final_verdict_reason"]
+        else:
+            breakdown["execution_incomplete"] = False
+            breakdown["measurement_incomplete"] = False
+            reliability_status = "RELIABLE"
+            reliability_reason = "All turn criteria received a conclusive evaluation."
+
         critical_failure = breakdown.get("critical_override", False)
         critical_count = sev_counts.get(Severity.CRITICAL.value, 0)
-        
+
         trajectory = None
         evidence_timeline = []
         reasoning = "Session evaluated based on aggregation of turn results."
         session_metadata = {}
-        
+
         if isinstance(self.llm_judge_provider, LLMJudge):
             traj, reason, timeline, meta = self.llm_judge_provider.evaluate_session(spec, turns)
             trajectory = traj
             evidence_timeline = timeline
             reasoning = reason
             session_metadata = meta
-        
+
         return EvaluationResult(
             passed=final_passed,
             score=score,
@@ -195,5 +273,7 @@ class Evaluator:
             critical_failure_count=critical_count,
             severity_counts=sev_counts,
             score_breakdown=breakdown,
-            session_metadata=session_metadata
+            session_metadata=session_metadata,
+            reliability_status=reliability_status,
+            reliability_reason=reliability_reason,
         )

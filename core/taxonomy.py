@@ -24,13 +24,13 @@ class FailureTag(str, Enum):
     INSTRUCTION_FAILURE = "instruction_failure"
     AUTH_ERROR = "AUTH_ERROR"
     TIMEOUT = "TIMEOUT"
-    
-    # Phase 8 Stateful additions
+
+
     STUBBORNNESS = "stubbornness"
     PREMATURE_COMMITMENT = "premature_commitment"
     INFORMATION_INEFFICIENCY = "information_inefficiency"
     STATE_CORRUPTION = "state_corruption"
-    SUCCESSFUL_SELF_CORRECTION = "successful_self_correction" # Positive signal
+    SUCCESSFUL_SELF_CORRECTION = "successful_self_correction"
 
 class RootCause(str, Enum):
     INSUFFICIENT_INFORMATION = "insufficient_information"
@@ -65,7 +65,7 @@ class RiskLevel(str, Enum):
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
 
-# Documentation for consistency
+
 TAXONOMY_DOCS = {
     FailureTag.UNSUPPORTED_ASSUMPTION: "The system assumes information that wasn't provided.",
     FailureTag.HALLUCINATION: "The system presents fabricated or nonexistent information as factual.",

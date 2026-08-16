@@ -26,7 +26,7 @@ class TestPhase22(unittest.TestCase):
             shutil.rmtree(BASELINE_DIR)
 
     def test_landing_page_loads(self):
-        """landing page loads"""
+
         res = self.client.get('/')
         self.assertEqual(res.status_code, 200)
         html = res.data.decode('utf-8')
@@ -36,8 +36,8 @@ class TestPhase22(unittest.TestCase):
         self.assertIn("Does your AI actually get better", html)
 
     def test_demo_launches_and_executes(self):
-        """demo launches, executes real evaluation, and progress state works"""
-        # Start demo
+
+
         res = self.client.post('/api/demo/start')
         if res.status_code != 200:
             print("ERROR in demo start:", res.data)
@@ -46,13 +46,13 @@ class TestPhase22(unittest.TestCase):
         job_id = data.get("job_id")
         self.assertIsNotNone(job_id)
 
-        # Check progress
+
         res_prog = self.client.get(f'/api/jobs/{job_id}')
         prog_data = json.loads(res_prog.data)
         self.assertEqual(prog_data['status'], 'RUNNING')
         self.assertIn('progress', prog_data)
 
-        # Wait for completion (since it's a fast local mock execution, ~1 sec)
+
         max_wait = 20
         completed = False
         for _ in range(max_wait):
@@ -64,10 +64,10 @@ class TestPhase22(unittest.TestCase):
                 break
             elif d['status'] == 'FAILED':
                 break
-        
+
         self.assertTrue(completed, "Demo did not complete successfully.")
-        
-        # Check export works
+
+
         exp_id = d['experiment_id']
         res_exp = self.client.get(f'/api/report/{exp_id}/json')
         self.assertEqual(res_exp.status_code, 200)
@@ -76,7 +76,7 @@ class TestPhase22(unittest.TestCase):
         self.assertIn('decision', report_data)
 
     def test_invalid_endpoint_error(self):
-        """invalid endpoint produces a friendly error"""
+
         res = self.client.post('/api/test_ai/start', json={
             "baseline_endpoint": "",
             "candidate_endpoint": "",

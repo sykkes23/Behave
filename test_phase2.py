@@ -18,7 +18,7 @@ class TestPhase2(unittest.TestCase):
             os.remove(DB_PATH)
 
     def test_multi_tag_and_persistence(self):
-        # 1. Create a dummy TestResult with multiple tags and a specific root cause
+
         eval_result = EvaluationResult(
             passed=False,
             score=75.0,
@@ -40,14 +40,14 @@ class TestPhase2(unittest.TestCase):
             metadata=ExecutionMetadata(),
             timestamp=time.time()
         )
-        
-        # 2. Persist
+
+
         save_test_result(test_result)
-        
-        # 3. Retrieve
+
+
         retrieved = get_test_result("run_phase2_001")
         self.assertIsNotNone(retrieved)
-        
+
         failure = retrieved.evaluation.failures[0]
         self.assertEqual(len(failure.tags), 2)
         self.assertIn("unsupported_assumption", failure.tags)
@@ -56,7 +56,7 @@ class TestPhase2(unittest.TestCase):
         self.assertEqual(failure.severity, "medium")
 
     def test_human_override_remains_functional(self):
-        # Test human override on the new schema
+
         eval_result = EvaluationResult(
             passed=False,
             score=50.0,
@@ -79,14 +79,14 @@ class TestPhase2(unittest.TestCase):
             timestamp=time.time()
         )
         save_test_result(test_result)
-        
+
         update_human_override("run_phase2_002", "PARTIAL", "Actually turbo is one of the causes in this specific model.", time.time())
         retrieved = get_test_result("run_phase2_002")
-        
+
         self.assertEqual(retrieved.evaluation.human_verdict, "PARTIAL")
 
     def test_backward_compatibility(self):
-        # Simulate an old v0.1.0 JSON format inserted into SQLite directly
+
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             old_failures_json = json.dumps([{
@@ -106,10 +106,10 @@ class TestPhase2(unittest.TestCase):
             ))
             conn.commit()
 
-        # Retrieve through the new system and ensure it maps `category` to `tags` properly
+
         retrieved = get_test_result("run_old_001")
         self.assertIsNotNone(retrieved)
-        
+
         failure = retrieved.evaluation.failures[0]
         self.assertEqual(failure.tags, ["Premature Conclusion"])
         self.assertEqual(failure.root_cause, "unknown")

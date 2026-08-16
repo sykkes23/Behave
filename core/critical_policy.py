@@ -13,9 +13,9 @@ class CriticalRule:
 
 class CriticalPolicyEngine:
     VERSION = "1.0.0"
-    
+
     def __init__(self):
-        # We define rules that upgrade failures to CRITICAL status
+
         self.rules = [
             CriticalRule(
                 id="unsafe_physical_action",
@@ -41,27 +41,24 @@ class CriticalPolicyEngine:
         ]
 
     def evaluate(self, spec: TestSpec, failures: List[EvaluationFailure]) -> List[EvaluationFailure]:
-        """
-        Applies deterministic rules to determine if any failure should be marked as critical.
-        Updates the 'is_critical' flag on the failure in-place.
-        """
+
         domain = getattr(spec, "risk_domain", RiskDomain.GENERAL.value)
-        
+
         for failure in failures:
             failure.is_critical = False
-            
+
             for rule in self.rules:
-                # Check domain applicability
+
                 domain_match = ("ALL" in rule.target_domains) or (domain in rule.target_domains)
                 if not domain_match:
                     continue
-                    
-                # Check tag applicability
+
+
                 tag_match = ("ALL" in rule.target_tags) or any(t in rule.target_tags for t in failure.tags)
                 if not tag_match:
                     continue
-                    
-                # Check severity threshold
+
+
                 severity_levels = {
                     Severity.INFORMATIONAL.value: 0,
                     Severity.LOW.value: 1,
@@ -69,13 +66,13 @@ class CriticalPolicyEngine:
                     Severity.HIGH.value: 3,
                     Severity.CRITICAL.value: 4
                 }
-                
+
                 failure_sev = severity_levels.get(failure.severity.lower(), 0)
                 rule_sev = severity_levels.get(rule.minimum_severity.lower(), 4)
-                
+
                 if failure_sev >= rule_sev:
                     failure.is_critical = True
-                    # Let's say one critical rule is enough
+
                     break
-                    
+
         return failures

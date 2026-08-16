@@ -1,26 +1,29 @@
 @echo off
+setlocal
+cd /d "%~dp0"
 echo Starting Behave AI Laboratory...
 
 python --version >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo Error: python is not installed or not in your PATH.
-    echo Please install Python 3 to run Behave.
+if errorlevel 1 (
+    echo Error: Python 3 is required but was not found.
     pause
     exit /b 1
 )
 
-echo Starting local demo agent (Agent v1 ^& v2)...
-start /b python demo_agent.py
+if not exist ".venv\Scripts\python.exe" (
+    echo Preparing Behave for first launch...
+    python -m venv .venv
+    if errorlevel 1 goto :fail
+)
 
-echo Starting Behave Dashboard...
-start /b python app.py
+".venv\Scripts\python.exe" -m pip install -q -r requirements.txt
+if errorlevel 1 goto :fail
 
-echo Waiting for services to start...
-timeout /t 2 /nobreak >nul
+".venv\Scripts\python.exe" launch_behave.py
+exit /b %errorlevel%
 
-echo Opening dashboard...
-start http://127.0.0.1:5000
-
-echo Behave is running. Close this window to stop.
+:fail
+echo.
+echo Behave setup failed. Check your internet connection and Python installation.
 pause
-taskkill /f /im python.exe >nul 2>&1
+exit /b 1

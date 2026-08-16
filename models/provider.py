@@ -28,7 +28,7 @@ class ProviderConfig:
     api_key: Optional[str] = None
     api_base: Optional[str] = None
     extra_settings: Dict[str, Any] = field(default_factory=dict)
-    
+
     def as_dict(self) -> Dict[str, Any]:
         d = {
             "provider_name": self.provider_name,
@@ -66,5 +66,5 @@ class BaseProvider(ABC):
 
     @abstractmethod
     def generate_response(self, prompt: str, history: Optional[List[Dict[str, str]]] = None) -> ProviderResponse:
-        """Generates a normalized response from the provider, optionally using history for multi-turn."""
+
         pass

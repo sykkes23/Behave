@@ -10,22 +10,22 @@ class VeniceProvider(BaseProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.api_key = config.api_key
-        # Default model if not specified
+
         self.model = config.model_name if config.model_name and config.model_name != "unknown" else "venice-default"
-        
+
     def generate_response(self, prompt: str, history: list = None) -> ProviderResponse:
         if not self.api_key:
             raise ProviderError(ProviderErrorType.AUTH_ERROR, "Venice API key is missing.")
-            
+
         url = "https://api.venice.ai/api/v1/chat/completions"
-        
+
         messages = []
         if history:
             for msg in history:
                 messages.append({"role": msg["role"], "content": msg["content"]})
-        
+
         messages.append({"role": "user", "content": prompt})
-        
+
         payload = {
             "model": self.model,
             "messages": messages,
@@ -39,29 +39,29 @@ class VeniceProvider(BaseProvider):
         req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), method='POST')
         req.add_header('Content-Type', 'application/json')
         req.add_header('Authorization', f'Bearer {self.api_key}')
-        
+
         start_time = time.monotonic()
-        
+
         def sanitize(text: str) -> str:
             if self.api_key and self.api_key in text:
                 return text.replace(self.api_key, "***SANITIZED***")
             return text
-            
+
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 latency_ms = (time.monotonic() - start_time) * 1000
                 response_data = json.loads(response.read().decode('utf-8'))
-                
+
                 content = response_data['choices'][0]['message']['content']
                 usage = response_data.get('usage', {})
                 input_tokens = usage.get('prompt_tokens')
                 output_tokens = usage.get('completion_tokens')
                 total_tokens = usage.get('total_tokens')
-                
+
                 request_id = response_data.get('id')
-                # OpenAI-compatible endpoints usually return the exact model used
+
                 model_used = response_data.get('model', self.model)
-                
+
                 return ProviderResponse(
                     provider="venice",
                     model=model_used,
@@ -74,9 +74,9 @@ class VeniceProvider(BaseProvider):
                         latency_ms=latency_ms,
                         time_to_first_token_ms=None
                     ),
-                    model_version="unknown" # Typically not provided separately in OpenAI spec
+                    model_version="unknown"
                 )
-                
+
         except urllib.error.HTTPError as e:
             err_body = sanitize(e.read().decode('utf-8'))
             if e.code == 401 or e.code == 403:

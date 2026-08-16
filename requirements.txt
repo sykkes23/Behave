@@ -1,5 +1,1 @@
-# No external dependencies required for v0.1.0 MVP
-# Future phases will include:
-# google-generativeai
-# requests
-# flask
+Flask>=3.1,<4

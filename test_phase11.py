@@ -21,7 +21,7 @@ class MockPhase11Provider(BaseProvider):
     def generate_response(self, prompt: str, history: list = None) -> ProviderResponse:
         if self.error:
             raise self.error
-        
+
         usage = self.usage or UsageMetrics()
         return ProviderResponse(
             provider="mock",
@@ -41,45 +41,45 @@ class TestPhase11(unittest.TestCase):
             os.remove(DB_PATH)
 
     def test_usage_normalization(self):
-        # Test 1 & 4 - Usage normalization and Cost calculation
+
         usage = UsageMetrics(input_tokens=1000, output_tokens=2000, total_tokens=3000, latency_ms=100)
-        # Temporarily mock pricing registry
+
         PricingEngine._registry["mock:mock-model"] = PricingModel("mock", "mock-model", 1.0, 2.0)
-        
+
         provider = MockPhase11Provider(usage=usage)
         evaluator = Evaluator()
         runner = TestRunner(provider=provider, evaluator=evaluator)
         spec = TestSpec(test_id="t1", scenario="test")
-        
+
         result = runner.run_test(spec)
         records = result.usage_json.get("records", [])
-        
+
         self.assertGreaterEqual(len(records), 1)
         gen_record = records[0]
-        
+
         self.assertEqual(gen_record["usage"]["input_tokens"], 1000)
         self.assertEqual(gen_record["usage"]["output_tokens"], 2000)
-        
-        # 1.0 per million for input = $0.001
-        # 2.0 per million for output = $0.004
-        # total = $0.005
+
+
+
+
         self.assertAlmostEqual(gen_record["cost_usd"], 0.005)
 
     def test_missing_usage_and_unknown_pricing(self):
-        # Test 2 & 5 - Missing usage, Unknown Pricing
+
         usage = UsageMetrics(input_tokens=None, output_tokens=None, total_tokens=None)
         provider = MockPhase11Provider(usage=usage)
         evaluator = Evaluator()
         runner = TestRunner(provider=provider, evaluator=evaluator)
         spec = TestSpec(test_id="t2", scenario="test")
-        
+
         result = runner.run_test(spec)
         records = result.usage_json.get("records", [])
         gen_record = records[0]
-        
+
         self.assertIsNone(gen_record["usage"]["input_tokens"])
         self.assertIsNone(gen_record["cost_usd"])
-        
+
         usage2 = UsageMetrics(input_tokens=1000, output_tokens=2000)
         provider2 = MockPhase11Provider(usage=usage2)
         provider2.config.model_name = "unknown-model-pricing"
@@ -89,68 +89,69 @@ class TestPhase11(unittest.TestCase):
         self.assertIsNone(gen_record2["cost_usd"])
 
     def test_latency_measured(self):
-        # Test 3 - Latency
+
         provider = MockPhase11Provider()
         evaluator = Evaluator()
         runner = TestRunner(provider=provider, evaluator=evaluator)
         spec = TestSpec(test_id="t3", scenario="test")
-        
-        # Just check the schema doesn't crash if we let it fallback to None
-        pass # Latency check in provider is via monotonic clock, but we use Mock here. 
+
+
+        pass
 
     def test_session_aggregation(self):
-        # Test 7 & 8 - Session Aggregation
+
         usage = UsageMetrics(input_tokens=1000, output_tokens=1000, total_tokens=2000, latency_ms=100)
         PricingEngine._registry["mock:mock-model"] = PricingModel("mock", "mock-model", 1.0, 1.0)
         provider = MockPhase11Provider(usage=usage)
         evaluator = Evaluator()
         runner = TestRunner(provider=provider, evaluator=evaluator)
-        
+
         spec = TestSpec(
             test_id="t4",
             scenario="test",
             turns=[TurnSpec(user_input="hi"), TurnSpec(user_input="hello")]
         )
-        
+
         result = runner.run_session(spec)
         self.assertEqual(len(result.turns), 2)
         self.assertEqual(result.turns[0].usage_json["records"][0]["cost_usd"], 0.002)
         self.assertEqual(result.turns[1].usage_json["records"][0]["cost_usd"], 0.002)
 
     def test_infrastructure_errors_metrics(self):
-        # Test 9 - Infrastructure Errors increment reliability metrics
+
         error = ProviderError(ProviderErrorType.TIMEOUT, "Timeout")
         provider = MockPhase11Provider(error=error)
         evaluator = Evaluator()
         runner = TestRunner(provider=provider, evaluator=evaluator)
         spec = TestSpec(test_id="t5", scenario="test")
-        
+
         result = runner.run_test(spec)
         self.assertEqual(result.provider_status, "TIMEOUT")
-        self.assertTrue(result.evaluation.passed) # Did not lower behavioral score (Phase 10)
+        self.assertFalse(result.evaluation.passed)
+        self.assertEqual(result.evaluation.score, 0.0)
 
     def test_secret_sanitization(self):
-        # Test 10 - Secret sanitization
+
         config = ProviderConfig(provider_name="gemini", api_key="SUPER_SECRET_KEY")
         provider = GeminiProvider(config=config)
-        
+
         import urllib.request
         from urllib.error import HTTPError
-        
-        # Mock urlopen to raise HTTPError with key in body
+
+
         def mock_urlopen(*args, **kwargs):
             import io
             body = b"Unauthorized access with key=SUPER_SECRET_KEY."
             fp = io.BytesIO(body)
             raise HTTPError(url="test", code=401, msg="Unauthorized", hdrs={}, fp=fp)
-            
+
         urllib.request.urlopen = mock_urlopen
-        
+
         with self.assertRaises(ProviderError) as context:
             provider.generate_response("test")
-            
+
         self.assertNotIn("SUPER_SECRET_KEY", str(context.exception))
         self.assertIn("SANITIZED", str(context.exception))
-        
+
 if __name__ == '__main__':
     unittest.main()

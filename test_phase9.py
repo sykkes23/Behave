@@ -19,10 +19,10 @@ class MockSessionJudgeProvider(BaseProvider):
 
     def generate_response(self, prompt: str, history: list = None) -> ProviderResponse:
         self.prompt_received = prompt
-        
+
         if "ERROR" in self.response_json:
             raise ProviderError(ProviderErrorType.PROVIDER_ERROR, "Simulated provider crash")
-            
+
         return ProviderResponse(
             provider="mock_session_judge",
             model="mock_model",
@@ -35,7 +35,7 @@ class TestPhase9(unittest.TestCase):
         if os.path.exists(DB_PATH):
             os.remove(DB_PATH)
         init_db()
-        
+
         self.spec = TestSpec(
             test_id="stateful_test_01",
             scenario="Diagnose fault.",
@@ -50,7 +50,7 @@ class TestPhase9(unittest.TestCase):
                 )
             ]
         )
-        
+
         self.turns = [
             TurnResult(
                 turn_id="t1",
@@ -75,7 +75,7 @@ class TestPhase9(unittest.TestCase):
             os.remove(DB_PATH)
 
     def test_chronological_transcript_and_prompt(self):
-        # 1, 2. Construct prompt chronologically
+
         response_json = json.dumps({
             "trajectory": "IMPROVING",
             "reasoning": "Model failed then improved.",
@@ -83,24 +83,24 @@ class TestPhase9(unittest.TestCase):
         })
         provider = MockSessionJudgeProvider(response_json)
         judge = LLMJudge(provider=provider)
-        
+
         traj, reasoning, timeline, meta = judge.evaluate_session(self.spec, self.turns)
-        
+
         self.assertIn("--- TURN 1 ---", provider.prompt_received)
         self.assertIn("USER: The vehicle has P0720.", provider.prompt_received)
         self.assertIn("FAILURES DETECTED: premature_commitment", provider.prompt_received)
-        
+
         self.assertEqual(traj, "IMPROVING")
         self.assertEqual(len(timeline), 2)
-        
+
     def test_malformed_and_error(self):
-        # 11, 12. Malformed JSON and Provider crash
+
         provider_malformed = MockSessionJudgeProvider("this is not json")
         judge_malformed = LLMJudge(provider=provider_malformed)
         traj, reasoning, timeline, meta = judge_malformed.evaluate_session(self.spec, self.turns)
         self.assertEqual(traj, "UNKNOWN")
         self.assertIn("malformed", reasoning.lower())
-        
+
         provider_error = MockSessionJudgeProvider("ERROR")
         judge_error = LLMJudge(provider=provider_error)
         traj, reasoning, timeline, meta = judge_error.evaluate_session(self.spec, self.turns)
@@ -108,16 +108,16 @@ class TestPhase9(unittest.TestCase):
         self.assertIn("failed", reasoning.lower())
 
     def test_database_persistence_and_metadata(self):
-        # 10. Persistence
+
         evaluator = Evaluator()
-        
+
         provider = MockSessionJudgeProvider(json.dumps({
             "trajectory": "SELF_CORRECTING",
             "reasoning": "Model self corrected.",
             "evidence_timeline": ["Event 1"]
         }))
         evaluator.llm_judge_provider = LLMJudge(provider=provider)
-        
+
         final_eval = evaluator.evaluate_session(self.spec, self.turns)
         session = SessionResult(
             session_id="sess_123",
@@ -128,15 +128,15 @@ class TestPhase9(unittest.TestCase):
             metadata=ExecutionMetadata(),
             timestamp=0.0
         )
-        
+
         save_session_result(session)
         fetched = get_session_result("sess_123")
-        
+
         self.assertEqual(fetched.final_evaluation.trajectory, "SELF_CORRECTING")
         self.assertEqual(len(fetched.final_evaluation.evidence_timeline), 1)
 
     def test_human_session_override(self):
-        # 9. Human override at the session level
+
         evaluator = Evaluator()
         provider = MockSessionJudgeProvider(json.dumps({
             "trajectory": "STUBBORN",
@@ -145,7 +145,7 @@ class TestPhase9(unittest.TestCase):
         }))
         evaluator.llm_judge_provider = LLMJudge(provider=provider)
         final_eval = evaluator.evaluate_session(self.spec, self.turns)
-        
+
         session = SessionResult(
             session_id="sess_456",
             test_id="test",
@@ -156,17 +156,17 @@ class TestPhase9(unittest.TestCase):
             timestamp=0.0
         )
         save_session_result(session)
-        
-        # Override
+
+
         import sqlite3
         conn = sqlite3.connect(DB_PATH)
         try:
             cursor = conn.cursor()
-            # Wait, the DB schema has final_evaluation_json in test_sessions, but human_verdict is stored there via _serialize_evaluation.
-            # To update it in DB directly, we'd have to parse JSON, update, re-serialize. 
-            # Or just update the object and call save_session_result again (assuming it supports REPLACE or we just trust the object model).
-            # test_sessions has PRIMARY KEY on session_id, so INSERT will fail if we just call save_session_result.
-            # We can use INSERT OR REPLACE. Let's adjust DB or just update it via Python.
+
+
+
+
+
             cursor.execute('SELECT final_evaluation_json FROM test_sessions WHERE session_id = ?', ("sess_456",))
             row = cursor.fetchone()
             eval_data = json.loads(row[0])
@@ -176,7 +176,7 @@ class TestPhase9(unittest.TestCase):
             conn.commit()
         finally:
             conn.close()
-            
+
         fetched = get_session_result("sess_456")
         self.assertEqual(fetched.final_evaluation.human_verdict, "PARTIAL")
         self.assertEqual(fetched.final_evaluation.human_reason, "It wasn't that bad.")

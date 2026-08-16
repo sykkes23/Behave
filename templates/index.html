@@ -33,7 +33,7 @@
         h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
         h2 { font-size: 1.8rem; margin-top: 2rem; border-bottom: 1px solid var(--muted); padding-bottom: 0.5rem; }
         p.lead { font-size: 1.25rem; color: var(--muted); margin-bottom: 3rem; }
-        
+
         .btn {
             display: inline-block;
             background: var(--primary);
@@ -54,10 +54,10 @@
             border: 2px solid var(--primary);
         }
         .btn-outline:hover { background: rgba(59, 130, 246, 0.1); }
-        
+
         .screen { display: none; }
         .screen.active { display: block; }
-        
+
         .card {
             background: var(--card-bg);
             padding: 30px;
@@ -65,8 +65,7 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
         }
-        
-        /* Progress */
+
         .progress-bar-container {
             width: 100%;
             background: #334155;
@@ -81,8 +80,7 @@
             width: 0%;
             transition: width 0.3s;
         }
-        
-        /* Results */
+
         .stat-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -98,7 +96,7 @@
         .stat-box.full { grid-column: span 2; }
         .stat-label { color: var(--muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
         .stat-value { font-size: 1.8rem; font-weight: bold; margin-top: 5px; }
-        
+
         .decision-badge {
             display: inline-block;
             padding: 15px 30px;
@@ -112,7 +110,7 @@
         .decision-CONDITIONAL { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 2px solid var(--warning); }
         .decision-REGRESSION { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 2px solid var(--danger); }
         .decision-BLOCKED { background: rgba(220, 38, 38, 0.4); color: #fca5a5; border: 2px solid var(--danger); }
-        
+
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; color: var(--muted); }
         input[type="text"], select {
@@ -124,7 +122,7 @@
             border-radius: 6px;
             box-sizing: border-box;
         }
-        
+
         .error-message {
             background: rgba(239, 68, 68, 0.1);
             border-left: 4px solid var(--danger);
@@ -132,7 +130,7 @@
             margin-bottom: 20px;
             border-radius: 4px;
         }
-        
+
         .dev-mode {
             margin-top: 40px;
             background: rgba(0,0,0,0.2);
@@ -167,26 +165,24 @@
 <body>
 
 <div class="container">
-    <!-- LANDING PAGE -->
     <div id="screen-landing" class="screen active text-center">
         <h1>BEHAVE</h1>
         <h2 style="margin-top: 0; font-size: 1.5rem; color: var(--muted); border: none;">AI BEHAVIOR TEST LAB</h2>
         <p class="lead" style="margin-bottom: 2rem;">Does your AI actually get better when you change it?</p>
-        
+
         <div class="card" style="text-align: center; max-width: 600px; margin: 0 auto 40px auto; background: transparent; box-shadow: none;">
-            <p>No installation. No API key required. No Python required.</p>
+            <p>No API key required for the demo. Python 3 is required; first launch prepares Behave automatically.</p>
         </div>
-        
+
         <div>
             <button class="btn" style="font-size: 1.5rem; padding: 15px 40px;" onclick="showScreen('screen-choose')">TRY DEMO</button>
         </div>
     </div>
 
-    <!-- CHOOSE AGENT PAGE -->
     <div id="screen-choose" class="screen text-center">
         <button class="btn btn-outline" style="position: absolute; top: 20px; left: 20px; padding: 8px 16px; font-size: 0.9rem;" onclick="showScreen('screen-landing')">← Back</button>
         <h2>Choose an agent</h2>
-        
+
         <div class="card" style="max-width: 500px; margin: 0 auto;">
             <button class="btn btn-outline" style="display: block; width: 100%; margin: 10px 0; font-size: 1.2rem; padding: 15px;" onclick="startDemo()">Demo Agent (Built-in)</button>
             <button class="btn btn-outline" style="display: block; width: 100%; margin: 10px 0; font-size: 1.2rem; padding: 15px;" onclick="showCustomForm('openai')">OpenAI-compatible endpoint</button>
@@ -195,7 +191,6 @@
         </div>
     </div>
 
-    <!-- TEST MY AI FORM (Hidden inside Choose initially) -->
     <div id="screen-test" class="screen">
         <button class="btn btn-outline" style="margin: 0 0 20px 0; padding: 8px 16px; font-size: 0.9rem;" onclick="showScreen('screen-choose')">← Back</button>
         <h2 id="custom-title">Configure Agent</h2>
@@ -225,7 +220,6 @@
         </div>
     </div>
 
-    <!-- PROGRESS PAGE -->
     <div id="screen-progress" class="screen text-center">
         <h2 id="progress-title">Testing Agent v1 vs Agent v2</h2>
         <div class="card">
@@ -237,7 +231,6 @@
         </div>
     </div>
 
-    <!-- ERROR PAGE -->
     <div id="screen-error" class="screen">
         <h2>Connection Error</h2>
         <div class="card">
@@ -258,7 +251,7 @@
         <div class="text-center" style="color: var(--muted); margin-bottom: 30px;">
             <span id="res-baseline-name">Agent v1</span> → <span id="res-candidate-name">Agent v2</span>
         </div>
-        
+
         <div class="stat-grid" style="margin-bottom: 10px;">
             <div class="stat-box">
                 <div class="stat-label">BEHAVIOR</div>
@@ -273,7 +266,7 @@
         <div class="card text-center" style="background: transparent; box-shadow: none; padding-top: 0;">
             <p style="color: var(--muted); margin-bottom: 5px;">Recommendation:</p>
             <div class="decision-badge" id="res-decision">DEPLOY</div>
-            
+
             <div style="margin-top: 15px;">
                 <button class="btn btn-outline" style="padding: 5px 15px; font-size: 0.9rem;" onclick="const wb = document.getElementById('why-box'); wb.style.display = wb.style.display === 'none' ? 'block' : 'none'">See Why</button>
             </div>
@@ -282,16 +275,16 @@
         <div class="card" id="why-box" style="display: none; border-left: 4px solid var(--primary);">
             <div id="res-explanation" style="font-size: 1.1rem; margin-bottom: 15px; color: #cbd5e1;"></div>
             <div id="why-content" style="color: #cbd5e1; line-height: 1.8;"></div>
-            
+
             <h4 style="margin-top: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">Behavioral Changes</h4>
             <div id="res-failures"></div>
-            
+
             <div style="display: flex; justify-content: space-between; margin-top: 20px; color: var(--muted); font-size: 0.9rem;">
                 <div>Cost Change: <span id="res-cost"></span></div>
                 <div>Latency Change: <span id="res-lat"></span></div>
             </div>
         </div>
-        
+
         <div class="text-center" style="margin-top: 30px;">
             <button class="btn btn-outline" onclick="showScreen('screen-landing')">START OVER</button>
             <button class="btn btn-outline" id="btn-export">EXPORT JSON</button>
@@ -310,7 +303,7 @@
         document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
         document.getElementById(id).classList.add('active');
     }
-    
+
     function displayError(msg) {
         document.getElementById('error-details').innerText = msg;
         showScreen('screen-error');
@@ -323,19 +316,19 @@
     function showCustomForm(provider) {
         let title = "Configure Custom HTTP Endpoint";
         let actualProvider = "http";
-        
+
         if (provider === 'openai') {
             title = "Configure OpenAI-compatible API";
             actualProvider = "openai";
             document.getElementById('v1-endpoint').placeholder = "http://localhost:8000/v1/chat/completions";
         } else if (provider === 'ollama') {
             title = "Configure Ollama API";
-            actualProvider = "openai"; // Ollama has openai compatible endpoints
+                actualProvider = "openai";
             document.getElementById('v1-endpoint').placeholder = "http://localhost:11434/v1/chat/completions";
         } else {
             document.getElementById('v1-endpoint').placeholder = "http://localhost:8080/v1/chat";
         }
-        
+
         document.getElementById('custom-title').innerText = title;
         document.getElementById('provider-type').value = actualProvider;
         showScreen('screen-test');
@@ -361,12 +354,12 @@
         const prov = document.getElementById('provider-type').value;
         const size = document.getElementById('test-size').value;
         const key = document.getElementById('api-key').value;
-        
+
         if (!v1 || !v2) {
             alert("Please enter both endpoints");
             return;
         }
-        
+
         if (!v1.startsWith('http')) {
             alert("Baseline endpoint must start with http:// or https://");
             return;
@@ -375,12 +368,12 @@
             alert("Candidate endpoint must start with http:// or https://");
             return;
         }
-        
+
         lastScreen = 'screen-test';
         showScreen('screen-progress');
         document.getElementById('progress-title').innerText = "Testing Custom Endpoints";
         try {
-            const res = await fetch('/api/test_ai/start', { 
+            const res = await fetch('/api/test_ai/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -404,17 +397,17 @@
         try {
             const res = await fetch(`/api/jobs/${currentJobId}`);
             const data = await res.json();
-            
+
             if (data.status === 'FAILED') {
                 clearInterval(pollInterval);
                 displayError(data.error || "Unknown error occurred.");
                 return;
             }
-            
+
             document.getElementById('progress-bar').style.width = data.progress + '%';
             document.getElementById('progress-pct').innerText = data.progress + '%';
             document.getElementById('progress-msg').innerText = data.message || "Running...";
-            
+
             if (data.status === 'COMPLETED') {
                 clearInterval(pollInterval);
                 loadResults(data.experiment_id);
@@ -428,13 +421,13 @@
         try {
             const res = await fetch(`/api/experiments/${exp_id}/results`);
             const data = await res.json();
-            
+
             const expRes = await fetch(`/api/experiments/${exp_id}`);
             const expData = await expRes.json();
-            
+
             renderResults(expData, data);
             showScreen('screen-results');
-            
+
             document.getElementById('btn-export').onclick = () => {
                 window.location.href = `/api/report/${exp_id}/json`;
             };
@@ -448,14 +441,14 @@
         const badge = document.getElementById('res-decision');
         badge.innerText = dec;
         badge.className = 'decision-badge decision-' + dec;
-        
+
         document.getElementById('res-baseline-name').innerText = exp.baseline;
         document.getElementById('res-candidate-name').innerText = exp.candidate;
-        
+
         const s = stats.score_res;
         const deltaStr = s.delta > 0 ? `+${s.delta.toFixed(1)}` : s.delta.toFixed(1);
         document.getElementById('res-score').innerText = `${s.baseline_mean.toFixed(1)} → ${s.candidate_mean.toFixed(1)}`;
-        
+
         const c = stats.crit_res;
         if (c.candidate > 0) {
             document.getElementById('res-crit').innerText = "FAIL";
@@ -464,24 +457,23 @@
             document.getElementById('res-crit').innerText = "PASS";
             document.getElementById('res-crit').style.color = "var(--success)";
         }
-        
+
         const r = stats.res_res;
         const cDelta = r.cost.delta_pct > 0 ? `+${r.cost.delta_pct.toFixed(1)}` : r.cost.delta_pct.toFixed(1);
         const lDelta = r.latency.delta_pct > 0 ? `+${r.latency.delta_pct.toFixed(1)}` : r.latency.delta_pct.toFixed(1);
         document.getElementById('res-cost').innerText = cDelta + "%";
         document.getElementById('res-lat').innerText = lDelta + "%";
-        
-        // Failure changes
+
         const failHtml = [];
         for (const [tag, stat] of Object.entries(stats.tag_res)) {
             if (stat.baseline_rate > 0 || stat.candidate_rate > 0) {
                 const bRate = (stat.baseline_rate * 100).toFixed(0);
                 const cRate = (stat.candidate_rate * 100).toFixed(0);
                 const color = stat.delta < 0 ? 'text-success' : (stat.delta > 0 ? 'text-danger' : '');
-                
+
                 let readableTag = tag.replace(/_/g, ' ');
                 readableTag = readableTag.charAt(0).toUpperCase() + readableTag.slice(1);
-                
+
                 failHtml.push(`
                     <div class="failure-change">
                         <span>${readableTag}</span>
@@ -490,17 +482,16 @@
                 `);
             }
         }
-        
+
         if (failHtml.length === 0) {
             document.getElementById('res-failures').innerHTML = '<div style="color: var(--muted)">No behavioral changes detected.</div>';
         } else {
             document.getElementById('res-failures').innerHTML = failHtml.join('');
         }
-        
-        // Why Explanation
+
         let expText = "";
         let whyHtml = "";
-        
+
         if (dec === 'DEPLOY') {
             expText = "Agent v2 behaved better than Agent v1, and the improvement was statistically significant with no critical regressions.";
             whyHtml = `
@@ -532,11 +523,10 @@
                 <div>The candidate agent produced behavior classified as critical. Because critical safety failures cannot be averaged away, the deployment decision is BLOCKED.</div>
             `;
         }
-        
+
         document.getElementById('res-explanation').innerText = expText;
         document.getElementById('why-content').innerHTML = whyHtml;
-        
-        // Dev Details
+
         document.getElementById('dev-json').innerText = JSON.stringify(stats, null, 2);
     }
 </script>

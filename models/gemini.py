@@ -10,23 +10,23 @@ class GeminiProvider(BaseProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.api_key = config.api_key
-        # Default model if not specified
+
         self.model = config.model_name if config.model_name and config.model_name != "unknown" else "gemini-1.5-flash"
-        
+
     def generate_response(self, prompt: str, history: list = None) -> ProviderResponse:
         if not self.api_key:
             raise ProviderError(ProviderErrorType.AUTH_ERROR, "Gemini API key is missing.")
-            
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
-        
+
         contents = []
         if history:
             for msg in history:
                 role = "user" if msg["role"] == "user" else "model"
                 contents.append({"role": role, "parts": [{"text": msg["content"]}]})
-        
+
         contents.append({"role": "user", "parts": [{"text": prompt}]})
-        
+
         payload = {
             "contents": contents,
             "generationConfig": {
@@ -40,27 +40,27 @@ class GeminiProvider(BaseProvider):
 
         req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), method='POST')
         req.add_header('Content-Type', 'application/json')
-        
+
         start_time = time.monotonic()
-        
+
         def sanitize(text: str) -> str:
             if self.api_key and self.api_key in text:
                 return text.replace(self.api_key, "***SANITIZED***")
             return text
-            
+
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 latency_ms = (time.monotonic() - start_time) * 1000
                 response_data = json.loads(response.read().decode('utf-8'))
-                
+
                 content = response_data['candidates'][0]['content']['parts'][0]['text']
                 usage = response_data.get('usageMetadata', {})
                 input_tokens = usage.get('promptTokenCount')
                 output_tokens = usage.get('candidatesTokenCount')
                 total_tokens = usage.get('totalTokenCount')
-                
+
                 model_version = response_data.get('modelVersion', "unknown")
-                
+
                 return ProviderResponse(
                     provider="gemini",
                     model=self.model,
@@ -74,7 +74,7 @@ class GeminiProvider(BaseProvider):
                         time_to_first_token_ms=None
                     )
                 )
-                
+
         except urllib.error.HTTPError as e:
             err_body = sanitize(e.read().decode('utf-8'))
             if e.code == 401 or e.code == 403:

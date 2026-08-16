@@ -13,17 +13,17 @@ class TestPhase13(unittest.TestCase):
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
         os.makedirs(self.test_dir)
-        
+
     def tearDown(self):
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
-            
+
     def _create_test_file(self, filename: str, content: dict):
         with open(os.path.join(self.test_dir, filename), "w") as f:
             json.dump(content, f, indent=2)
 
     def test_corpus_loading_and_validity(self):
-        # 1, 2, 3: Suites, versioning, validity
+
         self._create_test_file("t1.json", {
             "test_id": "t1",
             "scenario": "test 1",
@@ -47,23 +47,23 @@ class TestPhase13(unittest.TestCase):
             "status": "VALID",
             "tags": ["hallucination"]
         })
-        
+
         manager = CorpusManager(corpus_dir=self.test_dir)
-        
-        # Total tests loaded
+
+
         self.assertEqual(len(manager.tests), 3)
-        
-        # Valid tests
+
+
         valid = manager.get_valid_tests()
         self.assertEqual(len(valid), 2)
         self.assertEqual(set(t.test_id for t in valid), {"t1", "t3"})
-        
-        # Domain filtering
+
+
         reasoning_tests = manager.get_tests_by_domain("reasoning")
         self.assertEqual(len(reasoning_tests), 2)
-        
+
     def test_coverage_tracking(self):
-        # 4: Coverage tracking
+
         self._create_test_file("t1.json", {
             "test_id": "t1",
             "scenario": "test 1",
@@ -87,10 +87,10 @@ class TestPhase13(unittest.TestCase):
             "status": "EXPERIMENTAL",
             "principles": ["p3"]
         })
-        
+
         manager = CorpusManager(corpus_dir=self.test_dir)
         cov = manager.compute_coverage()
-        
+
         self.assertEqual(cov["total_tests"], 3)
         self.assertEqual(cov["status"]["VALID"], 2)
         self.assertEqual(cov["status"]["EXPERIMENTAL"], 1)

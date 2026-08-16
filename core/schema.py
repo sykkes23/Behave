@@ -15,24 +15,26 @@ class TurnSpec:
 
 @dataclass
 class TestSpec:
+    __test__ = False
+
     test_id: str
     scenario: str
     test_version: str = "unknown"
     turns: List[TurnSpec] = field(default_factory=list)
-    # Legacy fields for backward compatibility with older single-turn tests
+
     criteria: List[EvaluationCriterion] = field(default_factory=list)
     required_behaviors: List[str] = field(default_factory=list)
     forbidden_behaviors: List[str] = field(default_factory=list)
     evaluation_criteria: List[str] = field(default_factory=list)
-    # Phase 13 Corpus Management fields
+
     domain: str = "general"
     risk_domain: str = "GENERAL"
     risk_level: str = "LOW"
     principles: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
-    status: str = "VALID" # VALID, INVALID, DEPRECATED, EXPERIMENTAL
-    
-    # Phase 14 Lineage fields
+    status: str = "VALID"
+
+
     origin: str = "manual"
     parent_test: Optional[str] = None
     parent_version: Optional[str] = None
@@ -52,19 +54,19 @@ class LayerEvaluation:
     verdict: LayerVerdict
     failures: List['EvaluationFailure'] = field(default_factory=list)
     reasoning: str = ""
-    confidence: Any = None # Support float or str (HIGH, MEDIUM, LOW)
+    confidence: Any = None
     criteria_results: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class EvaluationFailure:
-    tags: List[str]          # Multi-tag taxonomy (e.g., ["unsupported_assumption"])
-    root_cause: str          # Why it happened (e.g., "reasoning_error")
+    tags: List[str]
+    root_cause: str
     observed_behavior: str
     expected_behavior: str
     severity: str
     is_critical: bool = False
-    
+
 class MeasurementReliability(str, Enum):
     RELIABLE = "RELIABLE"
     QUESTIONABLE = "QUESTIONABLE"
@@ -78,23 +80,23 @@ class EvaluationResult:
     failures: List[EvaluationFailure] = field(default_factory=list)
     reasoning: str = ""
     layer_evaluations: List[LayerEvaluation] = field(default_factory=list)
-    # Session-level holistic fields
+
     trajectory: Optional[str] = None
     evidence_timeline: List[str] = field(default_factory=list)
-    
-    # New Phase 10 Scoring Fields
+
+
     critical_failure: bool = False
     critical_failure_count: int = 0
     severity_counts: Dict[str, int] = field(default_factory=dict)
     score_breakdown: Dict[str, Any] = field(default_factory=dict)
     session_metadata: Dict[str, Any] = field(default_factory=dict)
 
-    # Phase 16 Reliability Status
+
     reliability_status: str = "INSUFFICIENT_DATA"
     reliability_reason: str = ""
-    
-    # Human Override Fields
-    human_verdict: Optional[str] = None  # PASS, FAIL, PARTIAL, INVALID TEST
+
+
+    human_verdict: Optional[str] = None
     human_reason: Optional[str] = None
     review_timestamp: Optional[float] = None
 
@@ -109,34 +111,36 @@ class ExecutionMetadata:
     system_prompt_hash: str = "unknown"
     configuration_hash: str = "unknown"
     evaluation_engine_version: str = "0.1"
-    # Judge Metadata
+
     judge_provider: str = "unknown"
     judge_model: str = "unknown"
     judge_prompt_hash: str = "unknown"
-    
-    # Phase 10 Metadata
+
+
     scoring_policy_version: str = "1.0.0"
     critical_policy_version: str = "1.0.0"
-    
-    # Phase 11 Metadata
+
+
     pricing_version: str = "2026-08-01"
     usage_schema_version: str = "1.0.0"
 
 @dataclass
 class TestResult:
-    run_id: str  # Unique ID for this execution (turn or session if single-turn)
+    __test__ = False
+
+    run_id: str
     test_id: str
     test_version: str
     ai_response: str
     evaluation: EvaluationResult
     metadata: ExecutionMetadata
     timestamp: float
-    
-    # Phase 11 tracking
+
+
     usage_json: Dict[str, Any] = field(default_factory=dict)
     provider_status: str = "SUCCESS"
     attempt_number: int = 1
-    
+
 @dataclass
 class TurnResult:
     turn_id: str
@@ -145,8 +149,8 @@ class TurnResult:
     ai_response: str
     evaluation: EvaluationResult
     timestamp: float
-    
-    # Phase 11 tracking
+
+
     usage_json: Dict[str, Any] = field(default_factory=dict)
     provider_status: str = "SUCCESS"
     attempt_number: int = 1
@@ -160,8 +164,8 @@ class SessionResult:
     final_evaluation: EvaluationResult
     metadata: ExecutionMetadata
     timestamp: float
-    
-    # Phase 11 tracking
+
+
     usage_json: Dict[str, Any] = field(default_factory=dict)
     provider_status: str = "SUCCESS"
     attempt_number: int = 1
@@ -195,9 +199,9 @@ class ExperimentDefinition:
     budget: float = 10.0
     stopping_rule: str = "completion"
     decision_policy: DecisionPolicy = field(default_factory=DecisionPolicy)
-    
-    # Execution tracking
-    status: str = "PLANNED" # PLANNED, RUNNING, COMPLETED, FAILED
+
+
+    status: str = "PLANNED"
     results_json: Optional[str] = None
     final_decision: Optional[FinalDecision] = None
     created_at: float = 0.0

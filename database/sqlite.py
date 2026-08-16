@@ -30,8 +30,8 @@ def init_db():
                 attempt_number INTEGER
             )
         ''')
-        
-        # Phase 8 Stateful schemas
+
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS test_sessions (
                 session_id TEXT PRIMARY KEY,
@@ -45,7 +45,7 @@ def init_db():
                 attempt_number INTEGER
             )
         ''')
-        
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS test_turns (
                 turn_id TEXT PRIMARY KEY,
@@ -68,7 +68,7 @@ def init_db():
 
 def save_test_result(result: TestResult):
     init_db()
-    
+
     failures_json = json.dumps([{
         "tags": f.tags,
         "root_cause": f.root_cause,
@@ -76,14 +76,14 @@ def save_test_result(result: TestResult):
         "expected_behavior": f.expected_behavior,
         "severity": f.severity
     } for f in result.evaluation.failures])
-    
+
     metadata_json = json.dumps(dataclasses.asdict(result.metadata))
     layer_evaluations_json = json.dumps([dataclasses.asdict(l) for l in result.evaluation.layer_evaluations])
-    
+
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
-        
-        # We might be dealing with an old database schema that doesn't have the new columns.
+
+
         try:
             cursor.execute('ALTER TABLE test_runs ADD COLUMN test_version TEXT')
         except sqlite3.OperationalError:
@@ -141,7 +141,7 @@ def update_human_override(run_id: str, verdict: str, reason: str, timestamp: flo
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            UPDATE test_runs 
+            UPDATE test_runs
             SET human_verdict = ?, human_reason = ?, review_timestamp = ?
             WHERE run_id = ?
         ''', (verdict, reason, timestamp, run_id))
@@ -150,21 +150,21 @@ def update_human_override(run_id: str, verdict: str, reason: str, timestamp: flo
 def get_test_result(run_id: str) -> Optional[TestResult]:
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
-        # Handle columns that might not exist in old schemas by selecting * and parsing manually or just fetching safe columns
-        # To be completely safe with backward compat:
+
+
         cursor.execute('PRAGMA table_info(test_runs)')
         columns = [info[1] for info in cursor.fetchall()]
-        
+
         cursor.execute(f'''
             SELECT * FROM test_runs WHERE run_id = ?
         ''', (run_id,))
         row = cursor.fetchone()
-        
+
         if not row:
             return None
-            
+
         row_dict = dict(zip(columns, row))
-        
+
         test_id = row_dict.get("test_id", "unknown")
         test_version = row_dict.get("test_version", "unknown")
         ai_response = row_dict.get("ai_response", "")
@@ -181,31 +181,31 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
         usage_json = row_dict.get("usage_json", "{}")
         provider_status = row_dict.get("provider_status", "SUCCESS")
         attempt_number = row_dict.get("attempt_number", 1)
-        
+
         failures_data = json.loads(failures_json)
         failures = []
         for f in failures_data:
-            # Backward compatibility with Phase 1
+
             if "category" in f:
                 f["tags"] = [f.pop("category")]
                 f["root_cause"] = "unknown"
             failures.append(EvaluationFailure(**f))
-            
+
         layers_data = json.loads(layer_evaluations_json)
         layer_evals = []
         for ld in layers_data:
             layer_failures = []
             for f in ld.get("failures", []):
-                # Backward compatibility with Phase 1
+
                 if "category" in f:
                     f["tags"] = [f.pop("category")]
                     f["root_cause"] = "unknown"
                 layer_failures.append(EvaluationFailure(**f))
-            
-            # Map back enum
+
+
             verdict_str = ld.get("verdict")
             verdict = LayerVerdict(verdict_str) if verdict_str else LayerVerdict.UNCERTAIN
-            
+
             layer_evals.append(LayerEvaluation(
                 layer_name=ld.get("layer_name", "unknown"),
                 verdict=verdict,
@@ -215,7 +215,7 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
                 criteria_results=ld.get("criteria_results", {}),
                 metadata=ld.get("metadata", {})
             ))
-        
+
         evaluation = EvaluationResult(
             passed=bool(auto_passed),
             score=score,
@@ -226,12 +226,12 @@ def get_test_result(run_id: str) -> Optional[TestResult]:
             human_reason=human_reason,
             review_timestamp=review_timestamp
         )
-        
+
         metadata = ExecutionMetadata()
         if metadata_json:
             metadata_dict = json.loads(metadata_json)
             metadata = ExecutionMetadata(**metadata_dict)
-        
+
         return TestResult(
             run_id=run_id,
             test_id=test_id,
@@ -277,11 +277,11 @@ def _deserialize_evaluation(json_str: str) -> EvaluationResult:
     if not json_str:
         return EvaluationResult(passed=False, score=0.0)
     data = json.loads(json_str)
-    
+
     failures = []
     for f in data.get("failures", []):
         failures.append(EvaluationFailure(**f))
-        
+
     layer_evals = []
     for ld in data.get("layer_evaluations", []):
         layer_failures = [EvaluationFailure(**f) for f in ld.get("failures", [])]
@@ -296,7 +296,7 @@ def _deserialize_evaluation(json_str: str) -> EvaluationResult:
             criteria_results=ld.get("criteria_results", {}),
             metadata=ld.get("metadata", {})
         ))
-        
+
     return EvaluationResult(
         passed=data.get("passed", False),
         score=data.get("score", 0.0),
@@ -319,7 +319,7 @@ def save_session_result(session: SessionResult):
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
-        
+
         cursor.execute('''
             INSERT INTO test_sessions (
                 session_id, test_id, test_version, final_evaluation_json, metadata_json, timestamp,
@@ -336,7 +336,7 @@ def save_session_result(session: SessionResult):
             session.provider_status,
             session.attempt_number
         ))
-        
+
         for turn in session.turns:
             cursor.execute('''
                 INSERT INTO test_turns (
@@ -368,25 +368,25 @@ def get_session_result(session_id: str) -> Optional[SessionResult]:
         s_row = cursor.fetchone()
         if not s_row:
             return None
-        
+
         cursor.execute('PRAGMA table_info(test_sessions)')
         s_cols = [info[1] for info in cursor.fetchall()]
         s_dict = dict(zip(s_cols, s_row))
-        
+
         cursor.execute('SELECT * FROM test_turns WHERE session_id = ? ORDER BY turn_number ASC', (session_id,))
         t_rows = cursor.fetchall()
         cursor.execute('PRAGMA table_info(test_turns)')
         t_cols = [info[1] for info in cursor.fetchall()]
-        
+
         turns = []
         for t_row in t_rows:
             t_dict = dict(zip(t_cols, t_row))
             turn_eval = _deserialize_evaluation(t_dict.get("evaluation_json", "{}"))
-            # Hydrate human overrides directly onto the turn's evaluation
+
             turn_eval.human_verdict = t_dict.get("human_verdict")
             turn_eval.human_reason = t_dict.get("human_reason")
             turn_eval.review_timestamp = t_dict.get("review_timestamp")
-            
+
             turns.append(TurnResult(
                 turn_id=t_dict["turn_id"],
                 turn_number=t_dict["turn_number"],
@@ -398,11 +398,11 @@ def get_session_result(session_id: str) -> Optional[SessionResult]:
                 provider_status=t_dict.get("provider_status", "SUCCESS"),
                 attempt_number=t_dict.get("attempt_number", 1)
             ))
-            
+
         meta = ExecutionMetadata()
         if s_dict.get("metadata_json"):
             meta = ExecutionMetadata(**json.loads(s_dict["metadata_json"]))
-            
+
         return SessionResult(
             session_id=s_dict["session_id"],
             test_id=s_dict.get("test_id", "unknown"),

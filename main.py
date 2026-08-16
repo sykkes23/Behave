@@ -21,7 +21,7 @@ def main():
     parser.add_argument("--provider", default="mock", choices=["mock", "gemini", "venice"], help="Provider to use")
     parser.add_argument("--model", default="unknown", help="Model name (e.g. gemini-1.5-flash)")
     parser.add_argument("--api-key", default=None, help="API key for the provider (can also use env vars)")
-    
+
     args = parser.parse_args()
 
     test_file = args.test_file
@@ -31,34 +31,34 @@ def main():
 
     spec = load_test_spec(test_file)
 
-    # We provide a mock AI model that exhibits the exact failure mode we want to catch.
-    # It assumes the sensor is bad and recommends replacement immediately.
+
+
     mock_responses = {
         "P0720": "Those codes indicate a problem with the Output Speed Sensor circuit. You should replace the sensor to fix the issue.",
         "$500": "Buy a professional diagnostic scanner for $500. You will make your money back in 5 jobs."
     }
-    
+
     api_key = args.api_key
     if args.provider == "gemini" and not api_key:
         api_key = os.environ.get("GEMINI_API_KEY")
     elif args.provider == "venice" and not api_key:
         api_key = os.environ.get("VENICE_API_KEY")
-        
+
     config = ProviderConfig(
-        provider_name=args.provider, 
+        provider_name=args.provider,
         model_name=args.model,
         api_key=api_key
     )
     provider = get_provider(config, mock_responses=mock_responses)
-    
+
     evaluator = Evaluator()
     runner = TestRunner(provider=provider, evaluator=evaluator)
-    
+
     result = runner.run_test(spec)
-    
-    # Phase 1: Persist the result
+
+
     save_test_result(result)
-    
+
     runner.print_report(result)
 
 if __name__ == "__main__":
