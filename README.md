@@ -1,90 +1,77 @@
-# BEHAVE: AI Behavior Test Lab
+# Behave — find the bugs your AI doesn't tell you about
 
-Does your AI actually get better when you change it?
+Changing a prompt or switching models is easy. Knowing whether the change actually made things better? That's the hard part.
 
-Behave is an AI evaluation and regression testing laboratory. It acts as a safety inspector for your AI, running it through hundreds of simulated conversations to determine if your latest prompt changes or model updates introduced behavioral regressions, safety failures, or cost explosions.
+I built **Behave** to answer that question with tests instead of guesses. It runs repeatable conversations against a baseline and a candidate AI, checks what changed, and gives you the evidence to decide whether the new version is worth keeping.
 
-The best way to understand Behave is to try it yourself.
+It's an engineering tool, not another chatbot.
 
-## Zero-Experience Demo
+## What it does
 
-You don't need API keys or provider configuration to try Behave.
-We've included a built-in demo agent that simulates a "V1" and "V2" AI so you can see exactly how the laboratory evaluates behavior, safety, and reliability.
+- **Compares versions:** Run the same scenarios against a baseline and a changed model or prompt.
+- **Catches regressions:** Look for behavioral failures, including safety problems that can get buried in average scores.
+- **Tests conversations, not just single replies:** Follow behavior across multiple turns.
+- **Tracks the trade-offs:** Compare scores alongside latency, token use, and estimated cost when the provider supplies the needed data.
+- **Keeps humans in the loop:** Review automated judgments and record overrides.
+- **Doesn't fake a pass:** If a test can't be evaluated reliably, Behave reports `INSUFFICIENT_DATA` instead of quietly handing out a perfect score.
 
-### How to Launch
+The point is simple: **if an AI changes, I want to know exactly what got better, what got worse, and why.**
 
-**On Windows:**
-Simply double-click `Start_Behave.bat`
+## Try it without an API key
 
-**On Mac / Linux:**
-Open a terminal and run:
+There's a built-in demo with two simulated versions of an AI. It's a quick way to see the testing flow without configuring a provider.
+
+**Windows:** Double-click `Start_Behave.bat`.
+
+**macOS / Linux:**
+
 ```bash
 ./Start_Behave.sh
 ```
-The launcher creates a private virtual environment and installs the small
-runtime dependency set on first use:
 
-```bash
-./Start_Behave.sh
-```
+The launcher sets up the local Python environment on first run. Open `http://127.0.0.1:5000` if the dashboard doesn't open automatically.
 
-### What Happens Next?
-1. Behave will start a local server and automatically open a dashboard in your browser (`http://127.0.0.1:5000`).
-2. Click **TRY DEMO**.
-3. Select **Demo Agent (Built-in)** and watch Behave run 8 parallel simulated conversations.
-4. Review the results! You will see exactly how Agent V2 improved over Agent V1, including safety checks, behavioral scoring, and the final deployment recommendation.
+In the dashboard:
 
-## Testing Your Own AI
+1. Choose **TRY DEMO**.
+2. Select **Demo Agent (Built-in)**.
+3. Run the sample comparison and inspect the results.
 
-Once you understand the demo, you can use Behave to test your own AI endpoints!
+The demo uses deterministic test agents. It's a walkthrough of the evaluation pipeline, **not** a claim that a production model has been validated.
 
-1. From the Behave Dashboard, select **TEST MY AI** (or click one of the external endpoint options).
-2. Enter your candidate and baseline API endpoints (e.g., `http://localhost:11434/v1/chat/completions` for Ollama).
-3. Select a test size (Quick, Standard, Full).
-4. Run the test and get a statistically sound evaluation of your AI.
+## Test your own endpoint
 
-## Technical Details
+Use **TEST MY AI** in the dashboard and configure the baseline and candidate endpoints. For example, a local Ollama endpoint can be used if you've already got Ollama running.
 
-Behave operates locally and does not send your data to the cloud. The laboratory contains:
-- **Stateful Evaluator:** Evaluates conversations across multiple turns.
-- **Decision Engine:** Translates statistical significance (Cohen's d, p-values) into clear DEPLOY/BLOCKED recommendations.
-- **Measurement Integrity:** Tracks LLM judge reliability and human overrides.
-- **Failure Taxonomy:** Automatically categorizes regressions (e.g., `unsafe_physical_action`, `premature_conclusion`).
+The evaluation interface supports smaller quick runs and larger test sets, depending on the scenarios you configure. Endpoint compatibility, usage reporting, and evaluator coverage depend on the provider and setup.
 
-*Welcome to the lab.*
+## Under the hood
 
-## Evaluation Integrity
+- **Python + Flask** for the local dashboard and evaluation API
+- **SQLite** for local test results
+- A repeatable **test corpus**, baseline comparisons, and experiment tracking
+- **Stateful evaluation**, failure categories, decision rules, and human review
+- A provider interface so the testing logic isn't tied to one model
 
-Behave treats evaluator coverage as part of the result. A criterion receives a
-PASS only when an implemented deterministic rule or configured semantic judge
-conclusively evaluates it. Unsupported criteria are reported as not evaluated
-with `INSUFFICIENT_DATA`; they do not receive a synthetic 100/100.
+I deliberately kept it local-first and relatively lightweight. I'd rather have a tool that's understandable and testable than a giant stack that makes a simple problem harder.
 
-The offline rule layer includes conservative handling for the bundled
-high-voltage safety, financial-risk, and stateful behavioral criteria. Phrase
-matching is negation-aware, so a warning such as "do not splice" is not treated
-as an instruction to splice. High-confidence dangerous paraphrases are checked
-as behavior families rather than relying only on one forbidden substring.
-
-## Public-Release Safety
-
-Runtime databases, logs, caches, generated baselines, experiment records, and
-archives are local artifacts and are excluded from version control. Before
-publishing a commit or source archive, run:
+## Run checks
 
 ```bash
 python -m pytest -q
 python tools/audit_public_release.py
 ```
 
-See [SECURITY.md](SECURITY.md) for private vulnerability reporting and
-[CONTRIBUTING.md](CONTRIBUTING.md) for reproducible behavioral-failure reports.
-The current claim boundaries are documented in
-[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
+These are the project's test and public-release audit commands. Run them before sharing a new build or source archive.
+
+## What it is — and isn't
+
+Behave is an **active research prototype**. It can surface measurable regressions using configured tests and evaluators; it **cannot certify an AI as safe or guarantee a result**. Small test sets can be misleading, automated judges make mistakes, and production deployments need more infrastructure and human review.
+
+The dashboard runs locally. If you connect it to a remote AI provider, requests to that endpoint are handled under that provider's rules.
+
+For the actual boundaries, see [Known Limitations](KNOWN_LIMITATIONS.md). Security issues go through [SECURITY.md](SECURITY.md), and reproducible bug reports are covered in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Behave is currently source-available for inspection, testing, and research
-review; it is not open source. See [LICENSE](LICENSE). This preserves the
-project's options while external evaluation and partnership discussions are
-still underway.
+The code is **source-available for inspection, testing, and research review**, not open-source licensed for unrestricted reuse. See [LICENSE](LICENSE).
