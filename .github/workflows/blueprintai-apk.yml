@@ -1,0 +1,55 @@
+name: BlueprintAI Android APK
+on:
+  push:
+    branches: [blueprintai-android-apk]
+    paths:
+      - "blueprintai/**"
+      - ".github/workflows/blueprintai-apk.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools "platforms;android-35" "build-tools;35.0.0"'
+      - name: Unpack original BlueprintAI Android project
+        run: |
+          mkdir -p "$RUNNER_TEMP/blueprintai"
+          base64 -d blueprintai/src-archive.tar.gz.b64 > "$RUNNER_TEMP/blueprintai-src.tar.gz"
+          tar -xzf "$RUNNER_TEMP/blueprintai-src.tar.gz" -C "$RUNNER_TEMP/blueprintai"
+          ls -la "$RUNNER_TEMP/blueprintai"
+          find "$RUNNER_TEMP/blueprintai" -maxdepth 3 -type f | sort | head -50
+      - name: Build real Android APK
+        working-directory: ${{ runner.temp }}/blueprintai
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - name: Verify signed APK
+        run: |
+          APK="$RUNNER_TEMP/blueprintai/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -15
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          mkdir -p output
+          cp "$APK" output/BlueprintAI-v1.0-debug.apk
+          sha256sum output/BlueprintAI-v1.0-debug.apk
+      - name: Upload shareable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlueprintAI-Android-APK
+          path: output/BlueprintAI-v1.0-debug.apk
+          if-no-files-found: error
+          retention-days: 30
